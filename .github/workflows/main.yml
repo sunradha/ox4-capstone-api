@@ -1,0 +1,61 @@
+name: Deploy FastAPI to AWS ECS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: oxford-grp4/workforce-reskill
+  ECS_CLUSTER: DevCluster
+  ECS_SERVICE: ox4-capstone-api
+  ECS_TASK_DEFINITION: ox4-capstone-api
+  CONTAINER_NAME: workforce-reskill
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::297046435697:role/ox4-capstone-ecs-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        run: |
+          IMAGE_TAG=latest
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Download Task Definition
+        run: |
+          aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION \
+          --query taskDefinition > task-definition.json
+
+      - name: Replace Image in Task Definition
+        run: |
+          sed -i "s|<AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/$ECR_REPOSITORY:.*|$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest|g" task-definition.json
+
+      - name: Register New Task Definition
+        id: task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query "taskDefinition.taskDefinitionArn" --output text)
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Deploy New Task Definition to ECS Service
+        run: |
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --task-definition $TASK_DEF_ARN
