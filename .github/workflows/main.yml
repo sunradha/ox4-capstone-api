@@ -53,8 +53,10 @@ jobs:
 
       - name: Download Task Definition
         run: |
-          aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION \
-          --query taskDefinition > task-definition.json
+            aws ecs describe-task-definition --task-definition $ECS_TASK_DEFINITION \
+            --query "taskDefinition.{family:family, networkMode:networkMode, executionRoleArn:executionRoleArn, taskRoleArn:taskRoleArn, containerDefinitions:containerDefinitions, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory}" \
+            --output json > task-definition.json
+
 
       - name: Replace Image in Task Definition
         run: |
