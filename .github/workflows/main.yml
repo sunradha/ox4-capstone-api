@@ -11,6 +11,7 @@ permissions:
 
 env:
   AWS_REGION: eu-west-1
+  AWS_ACCOUNT_ID: 297046435697                                     # <-- Added this!
   ECR_REPOSITORY: oxford-grp4/workforce-reskill
   ECS_CLUSTER: DevCluster
   ECS_SERVICE: ox4-capstone-api
@@ -34,11 +35,20 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, Tag, and Push Docker Image
+      - name: Build Docker Image
         run: |
           IMAGE_TAG=latest
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .                  # Build the image locally
+
+      - name: Tag Docker Image for ECR
+        run: |
+          IMAGE_TAG=latest
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Push Docker Image to ECR
+        run: |
+          IMAGE_TAG=latest
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Download Task Definition
@@ -48,7 +58,7 @@ jobs:
 
       - name: Replace Image in Task Definition
         run: |
-          sed -i "s|<AWS_ACCOUNT_ID>.dkr.ecr.<region>.amazonaws.com/$ECR_REPOSITORY:.*|$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest|g" task-definition.json
+          sed -i "s|\"image\": \".*\"|\"image\": \"$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest\"|g" task-definition.json
 
       - name: Register New Task Definition
         id: task-def
