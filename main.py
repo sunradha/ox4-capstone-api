@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from api import route, health
 
-app = FastAPI(title="Process Mining API")
+app = FastAPI(title="Workforce Reskilling APIs")
 
 # CORS setup
 app.add_middleware(
