@@ -57,7 +57,6 @@ jobs:
             --query "taskDefinition.{family:family, networkMode:networkMode, executionRoleArn:executionRoleArn, taskRoleArn:taskRoleArn, containerDefinitions:containerDefinitions, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory}" \
             --output json > task-definition.json
 
-
       - name: Replace Image in Task Definition
         run: |
           sed -i "s|\"image\": \".*\"|\"image\": \"$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest\"|g" task-definition.json
