@@ -15,7 +15,7 @@ env:
   ECR_REPOSITORY: oxford-grp4/workforce-reskill
   ECS_CLUSTER: DevCluster
   ECS_SERVICE: ox4-capstone-api
-  ECS_TASK_DEFINITION: ox4-capstone-api
+  ECS_TASK_DEFINITION: oxford4-capstone-ecs-task-defination
   CONTAINER_NAME: workforce-reskill
 
 jobs:
