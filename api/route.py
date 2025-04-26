@@ -1,45 +1,40 @@
+import logging
 from fastapi import APIRouter, HTTPException
-from models.schemas import QueryRequest, ReasoningRequest
-from services.process import handle_process_request
-from services.reasoning import query_openai_reasoning
-from db.client import supabase
-import pandas as pd
+from pydantic import BaseModel
+from services.analyzer import run_reasoning_pipeline
 
 router = APIRouter()
 
-
-@router.post("/process-mining")
-async def process_mining(request: QueryRequest):
-    return await handle_process_request(request)
+logger = logging.getLogger(__name__)
 
 
-@router.post("/reasoning")
-async def reasoning_query(request: ReasoningRequest):
-    return await query_openai_reasoning(request.data, request.question)
+class QuestionRequest(BaseModel):
+    question: str
 
 
-@router.get("/training-performance")
-def training_performance():
-    result = supabase.table("training_program_performance").select("*").execute()
-    return result.data
+@router.post("/ask-question")
+def process_question(request: QuestionRequest):
+    question = request.question
 
+    try:
+        reasoning_result = run_reasoning_pipeline(question)
+        is_success = reasoning_result.get("error") is None
 
-@router.get("/high-risk-roles")
-def get_high_risk_roles():
-    result = supabase.table("job_risk").select("job_title, automation_probability").gt("automation_probability",
-                                                                                       0.7).execute()
-    return result.data
-
-
-@router.get("/training-effectiveness")
-def get_training_effectiveness():
-    result = supabase.table("workforce_reskilling_cases").select("*").execute()
-    if not result.data:
-        return {"message": "No data found"}
-
-    df = pd.DataFrame(result.data)
-    effectiveness = df.groupby("training_program")["certification_earned"].mean().reset_index()
-    effectiveness['certification_earned'] = effectiveness['certification_earned'].apply(
-        lambda x: "Success" if x >= 0.5 else "Failure")
-
-    return effectiveness.to_dict(orient="records")
+        return {
+            "status": "success" if is_success else "failure",
+            "result": reasoning_result
+        }
+    except Exception as e:
+        logger.error(f"Pipeline execution error: {e}")
+        return {
+            "status": "failure",
+            "result": {
+                "reasoning_type": None,
+                "reasoning_justification": None,
+                "intent": None,
+                "intent_justification": None,
+                "reasoning_answer": None,
+                "graph": None,
+                "error": str(e)
+            }
+        }
