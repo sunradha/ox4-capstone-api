@@ -11,3 +11,9 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install -r requirements.txt
 
 COPY . .
+
+# EXPOSE port (optional, good practice)
+EXPOSE 8000
+
+# Start FastAPI app with Uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
