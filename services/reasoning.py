@@ -1,36 +1,26 @@
-import openai
-from fastapi import HTTPException
-from config import settings
-import json
-
-# Set your OpenAI API key
-openai.api_key = settings.OPENAI_KEY
+from utils.openai_client import classify_reasoning_and_intent
 
 
-async def query_openai_reasoning(formatted_data: dict, question: str) -> dict:
-    try:
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a process mining and data analysis expert. Analyze the provided data and answer the question with detailed insights."
-            },
-            {
-                "role": "user",
-                "content": f"I have the following data:\n{json.dumps(formatted_data, indent=2)}\n\nQuestion: {question}"
-            }
-        ]
+def get_reasoning_category_and_intent(question):
+    reasoning_output = classify_reasoning_and_intent(question)
 
-        response = await openai.ChatCompletion.acreate(
-            model="gpt-4o",
-            messages=messages,
-            temperature=0.2,
-            max_tokens=1500
-        )
+    # Initialize variables
+    reasoning_type = None
+    reasoning_justification = None
+    intent = None
+    intent_justification = None
 
-        return {
-            "analysis": response.choices[0].message.content,
-            "reasoning_path": "OpenAI reasoning process applied to structured data"
-        }
+    # Parse the LLM output line by line
+    for line in reasoning_output.split('\n'):
+        line = line.strip()
+        if line.lower().startswith("reasoning type:"):
+            reasoning_type = line.split(":", 1)[1].strip()
+        elif line.lower().startswith("reasoning justification:"):
+            reasoning_justification = line.split(":", 1)[1].strip()
+        elif line.lower().startswith("intent:"):
+            intent = line.split(":", 1)[1].strip()
+        elif line.lower().startswith("intent justification:"):
+            intent_justification = line.split(":", 1)[1].strip()
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+    return reasoning_type, reasoning_justification, intent, intent_justification
+

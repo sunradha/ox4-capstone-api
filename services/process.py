@@ -1,32 +1,45 @@
 from fastapi import HTTPException
-from models.schemas import QueryRequest
-from db.client import supabase
-from services.graph import generate_process_graph
+import pandas as pd  # For handling HTTP exceptions
+from services.datafetcher import fetch_data_from_supabase, \
+    fetch_data_from_supabase_psycopg2  # For fetching data from Supabase
 from services.formatter import format_data_for_openai
-import pandas as pd
+from services.graph import generate_process_graph
+from utils.sql_queries import sql_queries, reasoning_queries  # For SQL and reasoning queries
+from utils.visualizer import (
+    visualize_process_mining,
+    visualize_knowledge_graph,
+    visualize_causal_graph
+)  # For visualizations
+from utils.openai_client import query_openai_o3  # For querying OpenAI
+from models.schemas import QueryRequest  # For handling request models
 
 
-def fetch_data_from_supabase(table_name: str, filters: dict = None):
-    query = supabase.table(table_name).select("*")
+def run_analysis(analysis_type):
+    """
+    Runs the complete workflow for the specified analysis type.
 
-    if filters:
-        for key, value in filters.items():
-            if key == "skill_category":
-                query = query.eq("skill_category", value)
-            elif key == "outcome":
-                query = query.eq("certification_earned", value.lower() == "success")
-            else:
-                query = query.eq(key, value)
+    Args:
+        analysis_type: 'process_mining', 'knowledge_graph', or 'causal_graph'
+    """
+    if analysis_type not in ['process_mining', 'knowledge_graph', 'causal_graph']:
+        raise ValueError("Invalid analysis type. Choose from: process_mining, knowledge_graph, causal_graph")
 
-    try:
-        result = query.execute()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Supabase error: {str(e)}")
+    # Fetch data using the appropriate SQL query
+    query_key = f"{analysis_type}_events" if analysis_type == "process_mining" else f"{analysis_type}_relationships"
+    data = fetch_data_from_supabase_psycopg2(sql_queries[query_key])
 
-    if not result.data:
-        raise HTTPException(status_code=404, detail="No data found")
+    # Query OpenAI with the appropriate reasoning query
+    insights = query_openai_o3(data.to_json(), reasoning_queries[analysis_type])
 
-    return result.data
+    # Visualize results using the appropriate function
+    if analysis_type == "process_mining":
+        visualize_process_mining(data)
+    elif analysis_type == "knowledge_graph":
+        visualize_knowledge_graph(data)
+    elif analysis_type == "causal_graph":
+        visualize_causal_graph(data)
+
+    return {"insights": insights}  # You might need to adjust response data as needed
 
 
 async def handle_process_request(request: QueryRequest):
@@ -59,6 +72,9 @@ async def handle_process_request(request: QueryRequest):
         raise HTTPException(status_code=400, detail="Invalid query_type")
 
     formatted_data = format_data_for_openai(data, query_type)
+    print("=================================")
+    print(formatted_data)
+    print("=================================")
     graph_image = generate_process_graph(data) if query_type == "process_mining" else None
 
     return {
