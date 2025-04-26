@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.analyzer import run_reasoning_pipeline
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 class QuestionRequest(BaseModel):
@@ -15,12 +18,23 @@ def process_question(request: QuestionRequest):
 
     try:
         reasoning_result = run_reasoning_pipeline(question)
+        is_success = reasoning_result.get("error") is None
 
         return {
-            "status": "success",
-            "reasoning_result": reasoning_result,
-            "message": "Reasoning pipeline executed successfully.",
-            "details": reasoning_result
+            "status": "success" if is_success else "failure",
+            "result": reasoning_result
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error(f"Pipeline execution error: {e}")
+        return {
+            "status": "failure",
+            "result": {
+                "reasoning_type": None,
+                "reasoning_justification": None,
+                "intent": None,
+                "intent_justification": None,
+                "reasoning_answer": None,
+                "graph": None,
+                "error": str(e)
+            }
+        }

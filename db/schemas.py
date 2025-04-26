@@ -45,7 +45,6 @@ CREATE TABLE public.dim_time_rows (
 );
 
 -- Fact Tables
-
 CREATE TABLE public.ess_iit_11_22_rows (
     country_name TEXT NULL,
     country_code TEXT NOT NULL,
