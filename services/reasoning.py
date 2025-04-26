@@ -22,5 +22,10 @@ def get_reasoning_category_and_intent(question):
         elif line.lower().startswith("intent justification:"):
             intent_justification = line.split(":", 1)[1].strip()
 
-    return reasoning_type, reasoning_justification, intent, intent_justification
+    return {
+        "reasoning_type": reasoning_type,
+        "reasoning_justification": reasoning_justification,
+        "intent": intent,
+        "intent_justification": intent_justification
+    }
 
