@@ -11,7 +11,8 @@ app = FastAPI(title="Workforce Reskilling APIs")
 ALLOWED_ORIGINS = [
     "https://future-proof-workforce-insights.lovable.app",
     "http://localhost:3000",
-    "http://localhost:8080"
+    "http://localhost:8080",
+    "http://2.220.53.210:8080"
 ]
 
 app.add_middleware(
@@ -42,4 +43,4 @@ async def log_requests(request: Request, call_next):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
