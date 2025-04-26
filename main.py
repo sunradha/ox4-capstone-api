@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from api import route, health
@@ -14,6 +15,30 @@ ALLOWED_ORIGINS = [
     "http://localhost:8080",
     "http://2.220.53.210:8080"
 ]
+
+
+def print_env_var(name, mask=True):
+    value = os.getenv(name)
+    if value:
+        if mask:
+            # Show only first 4 characters and mask the rest
+            display_value = value[:4] + "****"
+        else:
+            display_value = value
+        print(f"{name} is set: {display_value}")
+    else:
+        print(f"{name} is NOT set!")
+
+
+# Safe printing (masking sensitive values)
+print_env_var("OPENAI_API_KEY")
+print_env_var("SUPABASE_URL", mask=False)  # URL is not as sensitive
+print_env_var("SUPABASE_KEY")
+print_env_var("DB_HOST", mask=False)
+print_env_var("DB_NAME", mask=False)
+print_env_var("DB_USER", mask=False)
+print_env_var("DB_PASS")
+print_env_var("DB_PORT", mask=False)
 
 app.add_middleware(
     CORSMiddleware,
