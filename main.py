@@ -1,11 +1,12 @@
 import logging
+import os
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from api import route, health
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 load_dotenv()
+from api import route, health
 
 app = FastAPI(title="Workforce Reskilling APIs")
 
@@ -17,6 +18,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:8080"
 ]
 
+# allow_origin_regex=r"^https:\/\/.*\.lovable\.dev$",
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
