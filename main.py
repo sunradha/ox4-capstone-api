@@ -11,6 +11,7 @@ app = FastAPI(title="Workforce Reskilling APIs")
 
 ALLOWED_ORIGINS = [
     "https://future-proof-workforce-insights.lovable.app",
+    "https://future-workforce-navigator.lovable.app",
     "https://lovable.dev",
     "http://localhost:3000",
     "http://localhost:8080"
