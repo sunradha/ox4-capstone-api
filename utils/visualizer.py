@@ -1,3 +1,4 @@
+import logging
 import os
 import io
 import re
@@ -57,6 +58,7 @@ def safe_exec_plotting_code(code, dataframe):
         os.makedirs(output_dir, exist_ok=True)
 
         output_path = os.path.join(output_dir, f'graph_{timestamp}.png')
+        logging.info("Saving the Graph to Output Folder")
         with open(output_path, 'wb') as f:
             f.write(buf.getvalue())
 

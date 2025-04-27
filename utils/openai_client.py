@@ -68,9 +68,6 @@ def generate_sql_and_plot_code(schemas, question, reasoning_type, intent):
     else:
         prompt = general_sql_prompt(schemas, question, reasoning_type, intent)
 
-    print("================== PROMPT =====================")
-    print(prompt)
-    print("================== PROMPT =====================")
     response = openai.ChatCompletion.create(
         model="gpt-4-turbo",
         messages=[{"role": "user", "content": prompt}],
@@ -337,7 +334,12 @@ Return only the Python code inside a Python code block.
 
 def parse_llm_response(response_text, reasoning_type, intent):
     # Parse Reasoning Answer
-    reasoning_match = re.search(r"1\. Reasoning(?: Answer)?:\s*(.*?)\n2\.", response_text, re.DOTALL)
+    reasoning_match = re.search(
+        r"1[\.\):\-]?\s*Reasoning(?: Answer)?:\s*(.*?)(?:\n\s*2[\.\):\-])",
+        response_text,
+        re.DOTALL | re.IGNORECASE
+    )
+
     reasoning_answer = reasoning_match.group(1).strip() if reasoning_match else ""
 
     # Parse SQL Query
