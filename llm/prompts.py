@@ -217,7 +217,7 @@ User Question: "{question}"
     → Example 3: industry_code → training_program with relationship 'offers'
 - NEVER leave source, target, or relationship as NULL.
   → If meaningful edges cannot be determined, explain why in the reasoning section and focus on nodes only.
-- IMPORTANT: To avoid overwhelming the frontend, ALWAYS limit the SQL query to **20–50 rows** using `LIMIT`. Apply a meaningful `ORDER BY` before the `LIMIT` — for example, `ORDER BY score DESC`, `timestamp DESC`, or `random()` if no natural ordering exists.
+- IMPORTANT: To avoid overwhelming the frontend, ALWAYS limit the SQL query to **20-25 rows** using `LIMIT`. Apply a meaningful `ORDER BY` before the `LIMIT` — for example, `ORDER BY score DESC`, `timestamp DESC`, or `random()` if no natural ordering exists.
 - IMPORTANT: If a table lacks natural foreign key relationships, consider deriving edges from data relationships (e.g., high score → training program) and explain this logic clearly in the reasoning section.
 
 ⚠️ NOTE: You cannot access real data values — generate the SQL to extract nodes and edges when executed.
