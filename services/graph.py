@@ -1,175 +1,195 @@
-import os
-import io
-import re
-import networkx as nx
-import matplotlib.pyplot as plt
-import pandas as pd
-import base64
-from pyvis.network import Network
+from db.client import run_sql_query_postgres
+from llm.openai_client import call_llm
+from db.schemas import TABLE_SCHEMAS
+from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt
+from utils.utils import parsed_graph_output, parsed_kg_sql_output, clean_dataframe_columns, parsed_kg_data_output
 
 
-def render_knowledge_graph_interactive(df, nodes_info, edges_info, output_html_path=None):
-    """
-    Renders an interactive Knowledge Graph using PyVis (Vis.js-based).
-    Args:
-        df (pd.DataFrame): SQL query result as DataFrame.
-        nodes_info (str): Node definitions from LLM output.
-        edges_info (str): Edge definitions from LLM output.
-        output_html_path (str): Path to save the interactive HTML file.
-    Returns:
-        str: Path to the generated HTML file.
-    """
-    net = Network(height="800px", width="100%", directed=False)
-    net.barnes_hut()  # Physics-based layout (similar to spring layout)
+def process_knowledge_graph(question, reasoning_type, visualization_type):
+    kg_sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)
+    kg_sql_response = call_llm(kg_sql_prompt)
+    parsed_schema = parsed_kg_sql_output(kg_sql_response)
 
-    # Parse nodes
-    nodes = []
-    for line in nodes_info.strip().split('\n'):
-        if ':' in line:
-            clean_line = re.sub(r'^[-*]\s+', '', line)
-            col_name = clean_line.split(':')[0].strip()
-            nodes.append(col_name)
+    sql = parsed_schema.get('generated_sql')
+    schema_kg_nodes = parsed_schema['graph_schema'].get('nodes')
+    schema_kg_edges = parsed_schema['graph_schema'].get('edges')
+    print("SQL :\n")
+    print(sql)
+    df = run_sql_query_postgres(sql)
+    if df.empty:
+        raise ValueError("No data returned from database.")
+    else:
+        df = clean_dataframe_columns(df)
 
-    # Add nodes
-    for node_col in nodes:
-        for val in df[node_col].dropna().unique():
-            net.add_node(str(val), label=str(val))
+    db_data_json = df.to_json(orient='records')
+    print("=====================================")
+    print(db_data_json)
+    print("=====================================")
+    data_kg_prompt = get_kg_data_prompt(question, db_data_json)
+    data_kg_response = call_llm(data_kg_prompt)
+    print("Data Response :\n", data_kg_response)
+    data_nodes, data_edges = parsed_kg_data_output(data_kg_response)
+    print("----------------------------------------------------")
+    print(data_nodes)
+    print(data_edges)
+    print("----------------------------------------------------")
 
-    # Parse edges
-    edge_lines = edges_info.strip().split('\n')
-    for line in edge_lines:
-        source_match = re.search(r'source: (.*?),', line)
-        target_match = re.search(r'target: (.*?),', line)
-        relationship_match = re.search(r'relationship: (.*)', line)
-        if source_match and target_match and relationship_match:
-            src_col = source_match.group(1).strip()
-            tgt_col = target_match.group(1).strip()
-            relationship = relationship_match.group(1).strip()
-
-            for _, row in df.iterrows():
-                if pd.notnull(row[src_col]) and pd.notnull(row[tgt_col]):
-                    net.add_edge(str(row[src_col]), str(row[tgt_col]), label=relationship)
-
-    # If no output path was provided, create the output directory and set the default file name
-    if not output_html_path:
-        output_dir = os.path.join(os.getcwd(), "output")
-        os.makedirs(output_dir, exist_ok=True)
-        output_html_path = os.path.join(output_dir, "knowledge_graph_interactive.html")
-
-    # ✅ Now generate the interactive HTML using PyVis
-    net.show(output_html_path)
-    print(f"✅ Interactive Knowledge Graph saved at: {output_html_path}")
-
-    return output_html_path  # Always return the final saved file path
+    graph_schema = {
+        "reasoning_answer": parsed_schema.get('reasoning_answer'),
+        "schema_nodes": schema_kg_nodes,
+        "schema_edges": schema_kg_edges,
+        "data_nodes": data_nodes,
+        "data_edges": data_edges
+    }
+    return graph_schema
 
 
-def render_knowledge_graph(df, nodes_info, edges_info):
-    G = nx.Graph()
+def process_causal_graph(question, reasoning_type, visualization_type):
+    schema_response = call_llm(get_cg_sql_prompt(question, reasoning_type, visualization_type))
+    parsed_schema = parsed_graph_output(schema_response, visualization_type)
+    sql = parsed_schema.get('generated_sql')
+    cause_nodes = parsed_schema['graph_schema'].get('cause_nodes')
+    effect_nodes = parsed_schema['graph_schema'].get('effect_nodes')
+    causal_edges = parsed_schema['graph_schema'].get('causal_edges')
 
-    # Parse nodes
-    nodes = []
-    for line in nodes_info.strip().split('\n'):
-        if ':' in line:
-            # Remove "- " or "* " at the start
-            clean_line = re.sub(r'^[-*]\s+', '', line)
-            col_name = clean_line.split(':')[0].strip()
-            nodes.append(col_name)
+    df = run_sql_query_postgres(sql)
+    if df.empty:
+        raise ValueError("No data returned from database.")
 
-    # Validate node columns exist in the DataFrame
-    missing_node_cols = [col for col in nodes if col not in df.columns]
-    if missing_node_cols:
-        raise ValueError(f"Missing node columns in data: {missing_node_cols}")
+    db_data_json = df.to_json(orient='records')
+    data_cg_response = call_llm(get_kg_data_prompt(question, db_data_json))
+    parsed_data_cg = parsed_data_kg_output(data_cg_response)
 
-    # Add nodes to graph
-    for node_col in nodes:
-        unique_nodes = df[node_col].dropna().unique()
-        G.add_nodes_from(unique_nodes)
-
-    # Parse edges
-    edge_lines = edges_info.strip().split('\n')
-    for line in edge_lines:
-        source_match = re.search(r'source: (.*?),', line)
-        target_match = re.search(r'target: (.*?),', line)
-        relationship_match = re.search(r'relationship: (.*)', line)
-
-        if source_match and target_match and relationship_match:
-            src_col = source_match.group(1).strip()
-            tgt_col = target_match.group(1).strip()
-            relationship = relationship_match.group(1).strip()
-
-            # Validate edge columns exist
-            if src_col not in df.columns or tgt_col not in df.columns:
-                raise ValueError(f"Missing edge columns in data: {src_col}, {tgt_col}")
-
-            # Add edges to the graph
-            for _, row in df.iterrows():
-                if pd.notnull(row[src_col]) and pd.notnull(row[tgt_col]):
-                    G.add_edge(row[src_col], row[tgt_col], label=relationship)
-
-    # Plot the graph
-    plt.figure(figsize=(12, 10))
-    pos = nx.spring_layout(G, k=0.5)
-    nx.draw(G, pos, with_labels=True, node_size=300, node_color='skyblue', font_size=8)
-    edge_labels = nx.get_edge_attributes(G, 'label')
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=6)
-    plt.tight_layout()
-
-    # Save plot to Base64 image
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')  # Save BEFORE closing or showing
-    buf.seek(0)
-
-    plt.close()  # Now safe to close
-
-    output_dir = os.path.join(os.getcwd(), "output")
-    os.makedirs(output_dir, exist_ok=True)
-
-    output_file_path = os.path.join(output_dir, "knowledge_graph_output.png")
-
-    with open(output_file_path, "wb") as f:
-        f.write(buf.getvalue())
-
-    # Return Base64 for API use
-    image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    return image_base64
+    graph_schema = {
+        "reasoning_answer": parsed_schema.get('reasoning_answer'),
+        "schema_nodes": cause_nodes + effect_nodes,
+        "schema_edges": causal_edges,
+        "data_nodes": parsed_data_cg.get('nodes'),
+        "data_edges": parsed_data_cg.get('edges')
+    }
+    return graph_schema, df
 
 
-def convert_to_causal_graph(data):
-    """
-    Converts a DataFrame into nodes and edges for Causal Graph visualization.
+def process_process_flow(question, reasoning_type):
+    schema_response = call_llm(get_process_flow_prompt(question, reasoning_type))
+    parsed_schema = parsed_graph_output(schema_response, "Process Flow")
+    sql = parsed_schema.get('generated_sql')
+    process_nodes = parsed_schema['graph_schema'].get('nodes')
+    process_edges = parsed_schema['graph_schema'].get('edges')
 
-    Expected Data Columns:
-        - cause
-        - effect
-        - confidence (optional)
+    df = run_sql_query_postgres(sql)
+    if df.empty:
+        raise ValueError("No data returned from database.")
 
-    Returns:
-        dict: {"nodes": [...], "edges": [...]}
-    """
-    nodes = []
-    edges = []
-    added_nodes = set()
+    db_data_json = df.to_json(orient='records')
+    data_pf_response = call_llm(get_kg_data_prompt(question, db_data_json))
+    parsed_data_pf = parsed_data_kg_output(data_pf_response)
 
-    for _, row in data.iterrows():
-        cause_id = f"Cause: {row['cause']}"
-        effect_id = f"Effect: {row['effect']}"
-        relationship_label = f"causes" + (
-            f" (Confidence: {row['confidence']})" if 'confidence' in row and row['confidence'] is not None else "")
+    graph_schema = {
+        "reasoning_answer": parsed_schema.get('reasoning_answer'),
+        "schema_nodes": process_nodes,
+        "schema_edges": process_edges,
+        "data_nodes": parsed_data_pf.get('nodes'),
+        "data_edges": parsed_data_pf.get('edges')
+    }
+    return graph_schema, df
 
-        # Add nodes
-        if cause_id not in added_nodes:
-            nodes.append({"id": cause_id, "type": "Cause", "label": row['cause']})
-            added_nodes.add(cause_id)
-        if effect_id not in added_nodes:
-            nodes.append({"id": effect_id, "type": "Effect", "label": row['effect']})
-            added_nodes.add(effect_id)
 
-        # Add edge
-        edges.append({
-            "source": cause_id,
-            "target": effect_id,
-            "relationship": relationship_label
-        })
+def process_charts(question, reasoning_type, visualization_type):
+    llm_graph_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
+    llm_response = call_llm(llm_graph_prompt)
+    parsed_response = parsed_graph_output(llm_response, visualization_type)
+    sql = parsed_response.get('generated_sql')
+    graph_schema = parsed_response.get('graph_schema')
 
-    return {"nodes": nodes, "edges": edges}
+    df = run_sql_query_postgres(sql)
+    if df.empty:
+        raise ValueError("No data returned from the database.")
+
+    return graph_schema, df
+
+# def generate_schema_kg_and_sql(question, reasoning_type, visualization_type):
+#     kg_sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)
+#     return call_llm(kg_sql_prompt)
+#
+#
+# def generate_data_kg(question, db_data):
+#     kg_sql_prompt = get_kg_data_prompt(question, reasoning_type)
+#     return call_llm(kg_sql_prompt)
+#
+#
+# def knowledge_graph_pipeline(question, reasoning_type, visualization_type):
+#     schema_kg_and_sql = generate_schema_kg_and_sql(question, reasoning_type, visualization_type)
+#
+#     data_kg = generate_data_kg(question, db_data)
+#     # Step 1: Generate KG schema + SQL
+#     prompt_step1 = f"""
+#     You are an assistant generating SQL queries and Knowledge Graph construction logic.
+#
+#     Reasoning Type: {reasoning_type}
+#     Visualization Type: {visualization_type}
+#     Schemas:
+#     {TABLE_SCHEMAS}
+#
+#     User Question: "{question}"
+#
+#     ⚡ IMPORTANT RULES:
+#     - Provide both the conceptual KG schema (based on schema relationships) AND the SQL query.
+#     - Alias final SQL columns as: node_id, node_label, node_type, source, target, relationship.
+#     - Deduplicate nodes using DISTINCT ON, GROUP BY, or window functions.
+#     - Explain all joins and relationships.
+#
+#     ⚠️ NOTE: You cannot access real data values. Your SQL query will be run on the database to extract real nodes and edges.
+#
+#     OUTPUT SECTIONS:
+#     1. Reasoning Answer:
+#     <Explain the graph logic and SQL approach>
+#
+#     2. SQL Query:
+#     ```sql
+#     <SQL query here>
+#     ```
+#
+#     3. Conceptual Knowledge Graph Schema:
+#     Nodes:
+#     - <column>: <entity_type>
+#     Edges:
+#     - source: <column>, target: <column>, relationship: <relationship_label>
+#     """
+#
+#     # → Send prompt_step1 to LLM
+#     step1_response = call_llm(prompt_step1)
+#
+#     # === OPTIONAL: Run SQL on your backend ===
+#     # db_data = run_sql_on_db(step1_response["sql_query"])
+#
+#     if db_data is None:
+#         return step1_response
+#
+#     # Step 2: Build data-driven KG from real DB data
+#     prompt_step2 = f"""
+#     You are an assistant creating a data-driven Knowledge Graph.
+#
+#     Here is the real query result data:
+#     {db_data}
+#
+#     ⚡ IMPORTANT:
+#     - Extract unique nodes and edges.
+#     - Identify node_id, node_label, node_type.
+#     - Identify source, target, and relationship for edges.
+#     - Return the KG in JSON format:
+#     {{
+#       "nodes": [{{ "id": "node_id", "label": "node_label", "type": "node_type" }}],
+#       "edges": [{{ "source": "source_id", "target": "target_id", "relationship": "edge_label" }}]
+#     }}
+#
+#     Provide only the final JSON, no explanation.
+#     """
+#
+#     # → Send prompt_step2 to LLM
+#     step2_response = call_llm(prompt_step2)
+#
+#     return {
+#         "step1": step1_response,
+#         "step2": step2_response
+#     }

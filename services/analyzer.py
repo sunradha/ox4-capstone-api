@@ -1,169 +1,76 @@
 import logging
-import pandas as pd
-from utils.openai_client import generate_sql_and_plot_code, regenerate_plot_code_from_columns, parse_llm_response
-from db.schemas import WORKFORCE_RESKILLING_SCHEMAS
-from db.client import run_sql_query_postgres
-from utils.visualizer import validate_generated_code, safe_exec_plotting_code
-from services.reasoning import get_reasoning_category_and_intent
-from services.graph import convert_to_causal_graph, render_knowledge_graph
+from llm.prompts import *
+from utils.utils import parsed_reasoning_output, parsed_graph_output
+from services.visualizer import prepare_chart_data
+from services.graph import *
 
 logger = logging.getLogger(__name__)
 
 
-def safe_render_knowledge_graph(data, nodes_info, edges_info):
-    try:
-        return render_knowledge_graph(data, nodes_info, edges_info)
-    except Exception as e:
-        logger.error(f"Knowledge Graph generation failed: {e}")
-        return None
+def classify_reasoning_type(question):
+    reasoning_prompt = get_reasoning_prompt(question)
+    reasoning_response = call_llm(reasoning_prompt)
+    return reasoning_response
 
 
-def safe_convert_to_causal_graph(data):
-    try:
-        return convert_to_causal_graph(data)
-    except Exception as e:
-        logger.error(f"Causal Graph generation failed: {e}")
-        return None
-
-
-def build_response(reasoning_type, reasoning_justification, intent, intent_justification,
-                   reasoning_answer=None, graph=None, error=None):
+def build_response(reasoning_type, reasoning_justification, reasoning_path,
+                   visualization_type, reasoning_answer=None, chart=None, error=None):
+    """
+    Builds a structured response dictionary for the API.
+    """
     return {
         "reasoning_type": reasoning_type,
         "reasoning_justification": reasoning_justification,
-        "intent": intent,
-        "intent_justification": intent_justification,
+        "reasoning_path": reasoning_path,
+        "visualization_type": visualization_type,
         "reasoning_answer": reasoning_answer,
-        "graph": graph,
+        "chart": chart,
         "error": error
     }
 
 
 def run_reasoning_pipeline(question):
-    """
-    Runs the reasoning pipeline for a given question.
-    Returns a structured response object.
-    """
-    if not question or not isinstance(question, str):
-        return build_response(
-            reasoning_type=None,
-            reasoning_justification=None,
-            intent=None,
-            intent_justification=None,
-            reasoning_answer=None,
-            graph=None,
-            error="Invalid input: question must be a non-empty string."
-            )
-
-    logger.info(f"User question: {question}")
-
     try:
-        # Step 1: Get reasoning type and intent
-        reasoning_result = get_reasoning_category_and_intent(question) or {}
+        # Step 1 → Get reasoning type + visualization type
+        reasoning_llm_output = classify_reasoning_type(question)
+        reasoning_result = parsed_reasoning_output(reasoning_llm_output)
+        reasoning_type = reasoning_result.get("reasoning_type", "Unknown").strip()
+        visualization_type = reasoning_result.get("visualization_type", "").strip()
 
-        reasoning_type = reasoning_result.get("reasoning_type", "Unknown")
-        reasoning_justification = reasoning_result.get("reasoning_justification", "No Justification Provided.")
-        intent = reasoning_result.get("intent", "Unknown")
-        intent_justification = reasoning_result.get("intent_justification", "No Justification Provided.")
+        graph_schema = {}
+        df = None
 
-        logger.info(f"Reasoning Type : {reasoning_type}")
-        logger.info(f"Reasoning Justification : {reasoning_justification}")
-        logger.info(f"Intent : {intent}")
-        logger.info(f"Intent Justification: {intent_justification}")
+        # STEP 2 → Select appropriate logic
+        if visualization_type == "Knowledge Graph":
+            graph_schema = process_knowledge_graph(question, reasoning_type, visualization_type)
+        elif visualization_type == "Causal Graph":
+            graph_schema, df = process_causal_graph(question, reasoning_type, visualization_type)
+        elif visualization_type == "Process Flow":
+            graph_schema, df = process_process_flow(question, reasoning_type)
+        else:
+            # fallback for other chart types
+            graph_schema, df = process_charts(question, reasoning_type, visualization_type)
+        print("Final G Schema :\n ", graph_schema)
+        # STEP 3 → Format frontend JSON
+        chart_json = prepare_chart_data(df, visualization_type, graph_schema)
 
-        # Prepare initial response
-        response = build_response(
+        return build_response(
             reasoning_type,
-            reasoning_justification,
-            intent,
-            intent_justification
+            reasoning_result.get("reasoning_justification"),
+            reasoning_result.get("reasoning_path"),
+            visualization_type,
+            graph_schema.get('reasoning_answer'),
+            chart_json,
+            None
         )
 
-        # Step 2: Generate SQL and parse output
-        llm_response = generate_sql_and_plot_code(WORKFORCE_RESKILLING_SCHEMAS, question, reasoning_type, intent)
-        parsed_output = parse_llm_response(llm_response, reasoning_type, intent) or {}
-
-        generated_sql = parsed_output.get("generated_sql")
-        reasoning_answer = parsed_output.get("reasoning_answer", "No reasoning answer provided.")
-
-        logger.info(f"Reasoning Answer :\n{reasoning_answer}")
-        logger.info(f"Generated SQL :\n{generated_sql}")
-
-        response["reasoning_answer"] = reasoning_answer
-        if not generated_sql:
-            response["error"] = "No SQL query generated by the LLM."
-            return response
-
-        # Step 3: Run SQL query
-        try:
-            data = run_sql_query_postgres(generated_sql)
-            if not isinstance(data, pd.DataFrame) or data.empty:
-                response["error"] = "No data returned from SQL query."
-                return response
-            logger.info("SQL query executed successfully. Preview:\n%s", data.head())
-        except Exception as e:
-            response["error"] = f"SQL execution failed for query '{generated_sql}': {str(e)}"
-            return response
-
-        # Step 4: Handle graph or plot generation
-        try:
-            if intent.lower().strip() == "knowledge graph":
-                graph_schema = parsed_output.get("graph_schema", {})
-                nodes_info = graph_schema.get("nodes")
-                edges_info = graph_schema.get("edges")
-
-                logger.info(f"Graph Nodes :\n{nodes_info}")
-                logger.info(f"Graph Nodes :\n{edges_info}")
-
-                if not nodes_info or not edges_info:
-                    raise ValueError("Missing nodes or edges information for knowledge graph.")
-
-                graph_image_base64 = render_knowledge_graph(data, nodes_info, edges_info)
-                response["graph"] = graph_image_base64
-                return response
-
-            elif intent.lower().strip() == "causal graph":
-                response["reasoning_answer"] = reasoning_answer
-                response["graph"] = convert_to_causal_graph(data)
-                return response
-
-            else:
-                # Default: Plot-based rendering
-                plot_result = None
-                generated_plot_code = parsed_output.get("generated_plot_code")
-                logger.info(f"Generated Python Code : \n{generated_plot_code}")
-
-                if validate_generated_code(generated_plot_code, data):
-                    plot_result = safe_exec_plotting_code(generated_plot_code, data)
-                else:
-                    logger.warning("Column mismatch detected. Regenerating plot code...")
-                    regenerated_plot_code = regenerate_plot_code_from_columns(data.columns.tolist(), question)
-
-                    if validate_generated_code(regenerated_plot_code, data):
-                        plot_result = safe_exec_plotting_code(regenerated_plot_code, data)
-                    else:
-                        raise RuntimeError("Column mismatch even after regeneration of plot code.")
-
-                if isinstance(plot_result, dict) and "error" in plot_result:
-                    raise RuntimeError(plot_result["error"])
-
-
-                response["graph"] = plot_result["image_base64"]
-                return response
-
-
-        except Exception as e:
-                    response["error"] = f"Graph or plot generation failed: {str(e)}"
-                    return response
-
-    except Exception as pipeline_exception:
-        logger.exception("Unexpected error in reasoning pipeline.")
+    except Exception as e:
         return build_response(
             reasoning_type=None,
             reasoning_justification=None,
-            intent=None,
-            intent_justification=None,
+            reasoning_path=None,
+            visualization_type=None,
             reasoning_answer=None,
-            graph=None,
-            error=f"Unexpected error: {str(pipeline_exception)}"
+            chart=None,
+            error=str(e)
         )
