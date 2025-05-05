@@ -13,14 +13,13 @@ def classify_reasoning_type(question):
     return reasoning_response
 
 
-def build_response(reasoning_type=None, reasoning_path=None, reasoning_answer=None, chart=None, error=None):
-    """
-    Builds a structured response dictionary for the API.
-    """
+def build_response(reasoning_type=None, reasoning_answer=None, reasoning_path=None, sql=None,
+                   chart=None, error=None):
     return {
         "reasoning_type": reasoning_type,
         "reasoning_answer": reasoning_answer,
         "reasoning_path": reasoning_path,
+        "sql": sql,
         "chart": chart,
         "error": error
     }
@@ -72,6 +71,7 @@ def run_reasoning_pipeline(question):
         return build_response(
             reasoning_type,
             reasoning_path,
+            sql,
             graph_schema.get("reasoning_answer"),
             chart_json,
             None
@@ -82,6 +82,7 @@ def run_reasoning_pipeline(question):
             reasoning_type=None,
             reasoning_answer=None,
             reasoning_path=None,
+            sql=None,
             chart=None,
             error=str(e)
         )
