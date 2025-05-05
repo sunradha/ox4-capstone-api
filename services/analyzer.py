@@ -1,7 +1,9 @@
 import logging
 import pandas as pd
+
+from db.client import run_sql_query_postgres
 from llm.prompts import *
-from utils.utils import parsed_reasoning_output, parsed_graph_output, parsed_sql, parsed_2sqls
+from utils.utils import parsed_reasoning_output, parsed_sql, parsed_2sqls
 from services.visualizer import prepare_chart_data
 from services.graph import *
 
