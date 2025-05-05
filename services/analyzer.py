@@ -37,11 +37,10 @@ def run_reasoning_pipeline(question):
         reasoning_type = f'{reasoning_justification} So this reasoning is of type "{reasoning_cat}"'
         reasoning_path = reasoning_result.get("reasoning_path")
         visualization_type = reasoning_result.get("visualization_type", "").strip()
-        print("====================================")
-        print(reasoning_type)
-        print(reasoning_path)
-        print(visualization_type)
-        print("====================================")
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print("Reasoning Type : \n", reasoning_type)
+        print("Reasoning Path : \n", reasoning_path)
+        print("Visualization Type : \n", visualization_type)
 
         df = pd.DataFrame()
         sql = None
@@ -102,6 +101,8 @@ def run_reasoning_pipeline(question):
             sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
+            print("Nodes SQL : \n", nodes_sql)
+            print("Edges SQL : \n", edges_sql)
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
             edges_df = run_sql_query_postgres(edges_sql) if edges_sql else None
 
@@ -135,7 +136,8 @@ def run_reasoning_pipeline(question):
             graph_schema = process_charts(question, reasoning_type, visualization_type, db_data_json)
 
         chart_json = prepare_chart_data(df, visualization_type, graph_schema)
-
+        print("Graph : \n", graph_schema)
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         return build_response(
             reasoning_type,
             graph_schema.get("reasoning_answer"),

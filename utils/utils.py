@@ -161,6 +161,7 @@ def parse_final_answer_response(text):
     else:
         return None
 
+
 def parsed_graph_output(response_text, visualization_type):
     reasoning = re.search(r"1\.\s*Reasoning.*?:\s*(.*?)(?:\n\s*2\.)", response_text, re.DOTALL)
     sql = re.search(r"2\.\s*SQL.*?```sql\n(.*?)```", response_text, re.DOTALL)
