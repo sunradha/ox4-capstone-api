@@ -185,18 +185,34 @@ User Question: \"{question}\"
 - THEN, write a second SQL to select the edge set, using only node IDs that appear in the first node query.
 - This guarantees all edges connect to valid nodes and no dangling edges appear.
 
+⚠️ ALIAS RULES (STRICT):
+- DO NOT use reserved keywords as table aliases.
+- ALWAYS use these safe aliases:
+    → dim_occupation → doc
+    → dim_industry → di
+    → fact_industry_automation_rows → fia
+    → dim_local_authority → dla
+    → employee_profile → ep
+    → workforce_reskilling_cases → wrc
+    → workforce_reskilling_events → wre
+
+⚠️ NODE MERGING RULE:
+- Only combine node sets using UNION if they represent similar entity types.
+- When merging unrelated node types (e.g., industry + occupation + risk), prefix node_id values to make them globally unique:
+    → 'IND_' || CAST(di.industry_code AS TEXT)
+    → 'OCC_' || CAST(doc.soc_code AS TEXT)
+    → 'RISK_' || CAST(fia.industry_code AS TEXT)
+- If merging leads to messy results, return only the most relevant node type.
+
 ⚙️ IMPORTANT SQL RULES:
-- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
-  → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
 - Always generate two separate SQL queries: one for nodes, one for edges.
-- Nodes SQL → always return: node_id, node_label, node_type.
-- Edges SQL → always return: source, target, relationship.
+- Nodes SQL → must return: node_id, node_label, node_type.
+- Edges SQL → must return: source, target, relationship.
 - Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
 - Use DISTINCT or GROUP BY to deduplicate if needed.
 - Apply LIMIT inside each SQL query if necessary (e.g., LIMIT 20).
-- Use safe table aliases (avoid reserved words).
 - Use only valid categorical values (e.g., completion_status: 'Failed', 'Completed').
-- Use PostgresSQL-compatible syntax.
+- Use PostgreSQL-compatible syntax.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
