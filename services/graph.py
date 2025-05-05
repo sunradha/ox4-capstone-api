@@ -1,8 +1,9 @@
 from db.client import run_sql_query_postgres
 from llm.openai_client import call_llm
 from db.schemas import TABLE_SCHEMAS
-from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt
-from utils.utils import parsed_graph_output, parsed_kg_sql_output, clean_dataframe_columns, parsed_kg_data_output
+from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt, get_reasoning_answer_prompt
+from utils.utils import parsed_graph_output, parsed_kg_sql_output, clean_dataframe_columns, parsed_kg_data_output, \
+    parse_final_answer_response
 
 
 def process_knowledge_graph(question, reasoning_type, db_data_json):
@@ -77,17 +78,15 @@ def process_process_flow(question, reasoning_type, db_data_json):
 
 
 def process_charts(question, reasoning_type, visualization_type, db_data_json):
-    llm_graph_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
+    llm_graph_prompt = get_reasoning_answer_prompt(question, reasoning_type, visualization_type, db_data_json)
     llm_response = call_llm(llm_graph_prompt)
-    parsed_response = parsed_graph_output(llm_response, visualization_type)
-    sql = parsed_response.get('generated_sql')
-    graph_schema = parsed_response.get('graph_schema')
-
-    df = run_sql_query_postgres(sql)
-    if df.empty:
-        raise ValueError("No data returned from the database.")
-
-    return graph_schema, df
+    reasoning_answer = parse_final_answer_response(llm_response)
+    graph_schema = {
+        "reasoning_answer": reasoning_answer,
+        "data_nodes": None,
+        "data_edges": None
+    }
+    return graph_schema
 
 # def generate_schema_kg_and_sql(question, reasoning_type, visualization_type):
 #     kg_sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)

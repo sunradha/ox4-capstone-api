@@ -85,7 +85,7 @@ def get_custom_prompt(question, reasoning_type, visualization_type):
 
 def get_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
-You are an assistant generating only SQL queries (no Python code) based on the reasoning type and visualization type.
+You are an assistant generating only SQL queries (no Python code, no explanations, no reasoning text) based on the reasoning type and visualization type.
 
 Reasoning Type: {reasoning_type}
 Visualization Type: {visualization_type}
@@ -96,7 +96,7 @@ User Question: \"{question}\"
 
 ⚡ --- IMPORTANT SQL GENERATION RULES (MUST FOLLOW) --- ⚡
 - Only use columns that are explicitly listed in the provided schema.
-- If the schema lacks required columns to create edges (e.g., no employee_id available), explain this in the reasoning and only return node-level results without edges.
+- If the schema lacks required columns to create edges (e.g., no employee_id available), only return node-level results without edges.
 - The SQL MUST be compatible with PostgreSQL dialect.
 - DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
   → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
@@ -107,7 +107,7 @@ User Question: \"{question}\"
 - Use ROUND(value::numeric, decimal_places) when rounding.
 - Handle division by zero using NULLIF.
 - Do NOT assume or invent additional columns.
-- If required data is missing in the schema, mention it in the reasoning.
+- If required data is missing in the schema, only return valid SQL using available data.
 
 ⚠️ IMPORTANT VALUE HANDLING:
 - When filtering on categorical columns (like completion_status), only use known, valid values:
@@ -115,7 +115,7 @@ User Question: \"{question}\"
 - Do NOT assume or invent new filter values.
 - If the user question uses qualitative words (like “difficult”) that don’t directly match a column value:
     → Map to the closest valid value **only if logical** (e.g., “difficult” → 'Failed')
-    → Or skip the filter and mention it in reasoning.
+    → Or skip the filter.
 
 **RULES FOR VISUALIZATION:**
 - When querying local_authority_code, JOIN dim_local_authority and SELECT dim_local_authority.local_authority_name AS label.
@@ -135,24 +135,6 @@ User Question: \"{question}\"
     - Knowledge Graph → node_id, node_label, node_type, source, target, relationship
     - Causal Graph → cause, effect, relationship
 
-**SPECIAL INSTRUCTIONS FOR KNOWLEDGE GRAPH AND CAUSAL GRAPH:**
-- Select both nodes and edges in a single query using `UNION ALL`.
-- Always construct the result with exactly six columns:
-    → node_id, node_label, node_type, source, target, relationship.
-- For node rows:
-    → Populate node_id, node_label, node_type; set source, target, relationship as NULL.
-- For edge rows:
-    → Populate source, target, relationship; set node_id, node_label, node_type as NULL.
-- Alias columns exactly as:
-    → node_id, node_label, node_type, source, target, relationship.
-- For Causal Graph, map cause → source, effect → target, and keep relationship.
-- Explain in the reasoning why you chose these nodes and edges.
-- If the schema lacks foreign keys or edge columns, derive edges logically from data meaning.
-- Example pattern:
-    (SELECT node_id, node_label, node_type, NULL AS source, NULL AS target, NULL AS relationship LIMIT 25)
-    UNION ALL
-    (SELECT NULL AS node_id, NULL AS node_label, NULL AS node_type, source, target, relationship LIMIT 25)
-    
 **EXAMPLES FOR DEDUPLICATION AND GRAPHS:**
 -- Example for Ranking Chart
 SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y
@@ -167,11 +149,11 @@ NEVER use reserved words as table aliases.
 
 Based on the provided Schemas, Reasoning Type, Visualization Type, and User Question, generate the correct SQL query following these rules.
 
-Provide your response in the following exact format:
+Provide ONLY the following exact response format (no explanation, no reasoning, no commentary):
 
 SQL Query:
-    ```sql
-    <SQL>
+```sql
+<SQL>
     ```
 """
 
@@ -324,3 +306,40 @@ Causal Edges:
   target: <effect_column>
   relationship: "causes" or other appropriate label
 """
+
+
+def get_reasoning_answer_prompt(question, reasoning_type, visualization_type, db_data_json):
+    return f"""
+You are an expert data analyst and reasoning assistant.
+
+User Question: "{question}"
+Reasoning Type: "{reasoning_type}"
+Visualization Type: "{visualization_type}"
+
+Here is the query result data (in JSON format):
+{db_data_json}
+
+⚡ SCHEMA:
+{TABLE_SCHEMAS}
+
+⚡ TASK:
+- Provide a clear, accurate, and well-reasoned **answer to the user's question** based entirely on the provided data.
+- Use the reasoning type and visualization type as context to guide your thinking.
+- Highlight key patterns, trends, comparisons, correlations, or anomalies from the data.
+- Walk through your reasoning so the user understands **why** this is the correct answer.
+- Make the explanation simple, precise, and understandable to a non-technical audience.
+
+⚡ OUTPUT FORMAT:
+Respond with exactly **one section**:
+
+Final Answer:
+<Your complete and reasoned answer here>
+
+⚡ IMPORTANT RULES:
+- Use only the actual data provided — do not invent or assume values not present in the JSON.
+- Stay concise but thorough; avoid unnecessary technical jargon.
+- Do **NOT** include markdown, bullet points, or formatting outside the specified section.
+- Do **NOT** include any code, SQL, or comments.
+"""
+
+

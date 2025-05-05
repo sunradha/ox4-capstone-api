@@ -143,14 +143,23 @@ def parsed_kg_sql(text: str) -> Dict[str, Optional[str]]:
 
 
 def parsed_sql(text):
-    pattern = r"1\. SQL Query:\s*```sql\s*(.*?)\s*```"
-    match = re.search(pattern, text, re.DOTALL)
+    pattern = r"```sql\s*(.*?)\s*```"
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     if match:
         sql = match.group(1).strip()
         return sql
     else:
         return None
 
+
+def parse_final_answer_response(text):
+    pattern = r"Final Answer:\s*(.*)"
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        final_answer = match.group(1).strip()
+        return final_answer
+    else:
+        return None
 
 def parsed_graph_output(response_text, visualization_type):
     reasoning = re.search(r"1\.\s*Reasoning.*?:\s*(.*?)(?:\n\s*2\.)", response_text, re.DOTALL)

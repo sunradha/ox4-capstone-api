@@ -44,7 +44,7 @@ def run_reasoning_pipeline(question):
         print("====================================")
 
         df = pd.DataFrame()
-        sql = None  # initialize sql variable
+        sql = None
 
         if visualization_type == "Knowledge Graph":
             sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)
@@ -98,15 +98,14 @@ def run_reasoning_pipeline(question):
             sql_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)
             sql = parsed_sql(llm_sql_response)
-            print("Generated SQL:\n", sql)
             df = run_sql_query_postgres(sql)
+
             if df.empty:
                 raise ValueError("No data returned from database.")
             df = clean_dataframe_columns(df)
             db_data_json = df.to_json(orient='records')
             graph_schema = process_charts(question, reasoning_type, visualization_type, db_data_json)
 
-        print("Final Chart Schema :\n", graph_schema)
         chart_json = prepare_chart_data(df, visualization_type, graph_schema)
 
         return build_response(
