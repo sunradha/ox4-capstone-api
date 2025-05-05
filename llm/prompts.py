@@ -16,7 +16,8 @@ def get_reasoning_prompt(question):
 
     Reasoning Type
     Classify the reasoning type of the question. Choose one from:
-    [Deductive, Inductive, Abductive, Causal, Counterfactual, Multi-Hop, Temporal, Probabilistic, Analogical, Ethical, Spatial, Scientific, Commonsense, Planning, Legal, Multi-Agent, Metacognitive]
+    [Deductive, Inductive, Abductive, Causal, Counterfactual, Multi-Hop, Temporal, Probabilistic, Analogical, Ethical, 
+    Spatial, Scientific, Commonsense, Planning, Legal, Multi-Agent, Metacognitive]
 
     Reasoning Justification
     Explain in one or two sentences why you classified the question as that reasoning type.
@@ -96,71 +97,57 @@ User Question: \"{question}\"
 ⚡ --- IMPORTANT SQL GENERATION RULES (MUST FOLLOW) --- ⚡
 - ONLY use the table names and columns provided in the schemas above.
 - The SQL MUST be compatible with PostgreSQL dialect.
-- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases. 
-  → Instead, use safe, non-reserved short aliases like `doc` for dim_occupation, `dia` for fact_industry_automation_rows, etc.
-- When using aggregation functions:
-  - Always specify the delimiter in STRING_AGG.
-  - PostgreSQL syntax for STRING_AGG is: STRING_AGG(expression, ', ' ORDER BY column).
-  - DO NOT use aggregate functions inside the GROUP BY clause — they belong in the SELECT list.
-  - Columns listed in the SELECT clause that are NOT part of aggregate functions MUST be included in GROUP BY.
-- Identify ALL columns used in the SELECT clause and classify them as aggregated or non-aggregated.
-- ONLY include the non-aggregated columns in the GROUP BY clause.
-- If STRING_AGG or similar aggregation is applied, use a subquery or CTE.
+- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.  
+  → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
+- When using aggregation:
+  - PostgreSQL STRING_AGG syntax: STRING_AGG(expression, ', ' ORDER BY column).
+  - Columns outside aggregate functions MUST be included in GROUP BY.
 - ALWAYS qualify column names with table aliases when joining tables.
-- When calculating time difference between two dates, subtract the dates to get days, and multiply by INTERVAL '1 day' to get seconds.
-- Use ROUND(value::numeric, decimal_places) when rounding double precision values.
-- Always handle division by zero safely using NULLIF.
-- If filtering on boolean columns, use proper checks for BOOLEAN or TEXT types.
-- If required data is not available in the given schemas, mention it in the reasoning.
+- Use ROUND(value::numeric, decimal_places) when rounding.
+- Handle division by zero using NULLIF.
 - Do NOT assume or invent additional columns.
-- **NEW RULES FOR CLEAN CHARTS:**
-  - When querying local_authority_code, always JOIN dim_local_authority ON local_authority_code and SELECT dim_local_authority.local_authority_name AS label instead of just showing the code.
-  - When showing metrics per location or category, apply aggregation (like AVG) and GROUP BY the dimension (e.g., GROUP BY local_authority_code, local_authority_name).
-  - For Ranking Chart, Comparative Bar Chart, Histogram, Pie Chart → use DISTINCT ON or a window function to remove duplicates.
-  - For Time Series Chart → include a date range filter or ORDER BY date DESC LIMIT 100.
-  - For all visualizations → add LIMIT 10 or LIMIT 15 to avoid clutter.
-  - ALWAYS alias SELECT columns as:
-    - x, y, label (for Ranking Chart)
-    - label, value (for Pie Chart)
-    - x, y (for Time Series Chart)
-    - x, series1, series2, etc. (for Comparative Bar Chart)
-    - value (for Histogram)
-- **NEW RULES FOR DEDUPLICATION AND READABLE OUTPUT:**
-  - When selecting location or entity names (such as local authorities), always JOIN to the corresponding dimension table to include human-readable names.
-  - For ranking and comparative charts, aggregate the data (for example, use AVG, SUM, or MAX) and apply GROUP BY on the non-aggregated columns.
-  - Always deduplicate results using DISTINCT ON, GROUP BY, or window functions to ensure clean chart outputs.
-  - When joining fact tables with dimension tables, always ensure that the result has one row per dimension entity (such as per local authority name) by applying:
-    (a) aggregation with GROUP BY, or
-    (b) DISTINCT ON (dimension column), or
-    (c) a window function (like ROW_NUMBER() OVER PARTITION BY dimension ORDER BY metric DESC).
-    Example: 
-    SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y
-    FROM fact_geographic_automation_rows fgar
-    JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code
-    ORDER BY dla.local_authority_name, fgar.probability_of_automation DESC
-    LIMIT 10;
-    or
-    SELECT dla.local_authority_name AS label, MAX(fgar.probability_of_automation) AS y
-    FROM fact_geographic_automation_rows fgar
-    JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code
-    GROUP BY dla.local_authority_name
-    ORDER BY y DESC
-    LIMIT 10;
+- If required data is missing in the schema, mention it in the reasoning.
 
-⚠️ **CRITICAL REMINDER ON ALIASING:**  
-NEVER use reserved words like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.  
-→ Always pick safe, clear aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), `ind` (dim_industry), etc.
+⚠️ IMPORTANT VALUE HANDLING:
+- When filtering on categorical columns (like completion_status), only use known, valid values:
+    → completion_status: 'Failed', 'Completed', 'In Progress'
+- Do NOT assume or invent new filter values.
+- If the user question uses qualitative words (like “difficult”) that don’t directly match a column value:
+    → Map to the closest valid value **only if logical** (e.g., “difficult” → 'Failed')
+    → Or skip the filter and mention it in reasoning.
 
-Based on the provided `Schemas`, `Reasoning Type`, `Visualization Type`, and `User Question`, perform the following actions:
-Analyze the User Question carefully and provide a clear reasoning explanation for the approach.
-Generate the correct SQL query following all the SQL generation rules and relationship constraints listed above.
+**RULES FOR VISUALIZATION:**
+- When querying local_authority_code, JOIN dim_local_authority and SELECT dim_local_authority.local_authority_name AS label.
+- When showing metrics per location/category, apply aggregation (e.g., AVG) and GROUP BY the dimension.
+- Deduplicate using DISTINCT ON, GROUP BY, or ROW_NUMBER() window functions.
+- Apply row limits to avoid clutter:
+    → Bar Chart → LIMIT 10  
+    → Pie Chart → LIMIT 5  
+    → Knowledge Graph / Causal Graph → LIMIT 20–25  
+    → Time Series → ORDER BY date DESC LIMIT 100
+- Always alias SELECT columns as:
+    - x, y, label (Ranking Chart)
+    - label, value (Pie Chart)
+    - x, y (Time Series Chart)
+    - x, series1, series2, etc. (Comparative Bar Chart)
+    - value (Histogram)
+
+**EXAMPLE FOR DEDUPLICATION:**
+SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y  
+FROM fact_geographic_automation_rows fgar  
+JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code  
+ORDER BY dla.local_authority_name, fgar.probability_of_automation DESC  
+LIMIT 10;
+
+⚠️ **ALIASING REMINDER:**  
+NEVER use reserved words as table aliases.  
+→ Use aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), `ind` (dim_industry), etc.
+
+Based on the provided Schemas, Reasoning Type, Visualization Type, and User Question, generate the correct SQL query following these rules.
 
 Provide your response in the following exact format:
 
-1. Reasoning Answer:
-<Your explanation here>
-
-2. SQL Query:
+1. SQL Query:
 ```sql
 <Write the SQL query here>
 ```
@@ -238,27 +225,55 @@ Edges:
 """
 
 
-def get_kg_data_prompt(question, db_data):
+def get_kg_data_prompt(question, reasoning_type, db_data_json):
     return f"""
-    You are an assistant creating a data-driven Knowledge Graph.
+You are an expert data analyst and knowledge graph assistant.
 
-    User Question: "{question}"
+User Question: "{question}"
+Reasoning Type: "{reasoning_type}"
 
-    Here is the real query result data:
-    {db_data}
+Here is the query result data (in JSON format):
+{db_data_json}
 
-    ⚡ IMPORTANT:
-    - Extract unique nodes and edges.
-    - Identify node_id, node_label, node_type.
-    - Identify source, target, and relationship for edges.
-    - Return the KG in JSON format:
-    {{
-      "nodes": [{{ "id": "node_id", "label": "node_label", "type": "node_type" }}],
-      "edges": [{{ "source": "source_id", "target": "target_id", "relationship": "edge_label" }}]
-    }}
+⚡ SCHEMA AND RELATIONSHIPS:
+{TABLE_SCHEMAS}
 
-    Provide only the final JSON, no explanation.
-    """
+⚡ TASKS:
+1️⃣ **Reasoning Answer**  
+- Provide a **detailed, insightful answer** to the user question based on the data, the reasoning type, and the schema.
+- Explain key patterns, trends, relationships, and important insights you can extract from the data.
+- Highlight meaningful relationships between entities (for example, which industries are most impacted, which regions stand out, key connections between occupations and risk, etc.).
+- Make the explanation easy to understand for a non-technical user.
+
+2️⃣ **Knowledge Graph JSON**  
+- Extract unique nodes and edges from the data.
+- Use the schema and relationships to infer meaningful edges — only create edges when data shows a clear relationship or when the schema defines a known connection.
+- For each node, include:
+    - id → unique identifier
+    - label → human-readable name
+    - type → category of node (e.g., industry, region, job, person, etc.)
+- For each edge, include:
+    - source → id of source node
+    - target → id of target node
+    - relationship → type of connection between source and target
+
+⚡ OUTPUT FORMAT:
+Respond with exactly **two sections**:
+1. Reasoning Answer:
+<Your detailed answer here>
+
+2. Nodes & Edges JSON:
+{{
+  "nodes": [{{ "id": "node_id", "label": "node_label", "type": "node_type" }}],
+  "edges": [{{ "source": "source_id", "target": "target_id", "relationship": "edge_label" }}]
+}}
+
+⚡ IMPORTANT RULES:
+- Deduplicate nodes and edges — no duplicates.
+- Use simple, clean IDs (no spaces or special characters).
+- Ensure all edge source/target IDs match node IDs.
+- Do **NOT** include any explanation, notes, or markdown outside the specified format.
+"""
 
 
 # Dedicated Prompt for Causal Graph

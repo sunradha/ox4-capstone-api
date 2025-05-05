@@ -5,39 +5,20 @@ from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt
 from utils.utils import parsed_graph_output, parsed_kg_sql_output, clean_dataframe_columns, parsed_kg_data_output
 
 
-def process_knowledge_graph(question, reasoning_type, visualization_type):
-    kg_sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)
-    kg_sql_response = call_llm(kg_sql_prompt)
-    parsed_schema = parsed_kg_sql_output(kg_sql_response)
+def process_knowledge_graph(question, reasoning_type, db_data_json):
 
-    sql = parsed_schema.get('generated_sql')
-    schema_kg_nodes = parsed_schema['graph_schema'].get('nodes')
-    schema_kg_edges = parsed_schema['graph_schema'].get('edges')
-    print("SQL :\n")
-    print(sql)
-    df = run_sql_query_postgres(sql)
-    if df.empty:
-        raise ValueError("No data returned from database.")
-    else:
-        df = clean_dataframe_columns(df)
-
-    db_data_json = df.to_json(orient='records')
-    print("=====================================")
-    print(db_data_json)
-    print("=====================================")
-    data_kg_prompt = get_kg_data_prompt(question, db_data_json)
+    data_kg_prompt = get_kg_data_prompt(question, reasoning_type, db_data_json)
     data_kg_response = call_llm(data_kg_prompt)
     print("Data Response :\n", data_kg_response)
-    data_nodes, data_edges = parsed_kg_data_output(data_kg_response)
+    reasoning_answer, data_nodes, data_edges = parsed_kg_data_output(data_kg_response)
     print("----------------------------------------------------")
+    print(reasoning_answer)
     print(data_nodes)
     print(data_edges)
     print("----------------------------------------------------")
 
     graph_schema = {
-        "reasoning_answer": parsed_schema.get('reasoning_answer'),
-        "schema_nodes": schema_kg_nodes,
-        "schema_edges": schema_kg_edges,
+        "reasoning_answer": reasoning_answer,
         "data_nodes": data_nodes,
         "data_edges": data_edges
     }
@@ -70,7 +51,7 @@ def process_causal_graph(question, reasoning_type, visualization_type):
     return graph_schema, df
 
 
-def process_process_flow(question, reasoning_type):
+def process_process_flow(question, reasoning_type, db_data_json):
     schema_response = call_llm(get_process_flow_prompt(question, reasoning_type))
     parsed_schema = parsed_graph_output(schema_response, "Process Flow")
     sql = parsed_schema.get('generated_sql')
@@ -95,7 +76,7 @@ def process_process_flow(question, reasoning_type):
     return graph_schema, df
 
 
-def process_charts(question, reasoning_type, visualization_type):
+def process_charts(question, reasoning_type, visualization_type, db_data_json):
     llm_graph_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
     llm_response = call_llm(llm_graph_prompt)
     parsed_response = parsed_graph_output(llm_response, visualization_type)

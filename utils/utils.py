@@ -89,28 +89,44 @@ def parsed_kg_sql_output(llm_output):
 
 
 def parsed_kg_data_output(llm_output_str):
-    """
-    Parses LLM JSON output string and returns data_nodes and data_edges lists.
+    # Extract the Reasoning Answer section
+    reasoning_match = re.search(r"1\. Reasoning Answer:\s*(.*?)(?:2\. Nodes & Edges JSON:|$)", llm_output_str,
+                                re.DOTALL | re.IGNORECASE)
+    reasoning_answer = reasoning_match.group(1).strip() if reasoning_match else ""
 
-    Args:
-        llm_output_str (str): JSON string from LLM.
+    # First try: with markdown fences
+    json_match = re.search(r"2\. Nodes & Edges JSON:\s*```json\s*(\{.*?\})\s*```", llm_output_str,
+                           re.DOTALL | re.IGNORECASE)
 
-    Returns:
-        tuple: (data_nodes, data_edges)
-            data_nodes: list of node dicts
-            data_edges: list of edge dicts
-    """
-    # Clean out markdown fences ```json ... ```
-    cleaned_str = re.sub(r"```json|```", "", llm_output_str, flags=re.IGNORECASE).strip()
+    # Fallback: without markdown fences
+    if not json_match:
+        json_match = re.search(r"2\. Nodes & Edges JSON:\s*(\{.*\})", llm_output_str, re.DOTALL | re.IGNORECASE)
 
-    # Parse the JSON string
-    llm_output = json.loads(cleaned_str)
+    json_str = json_match.group(1).strip() if json_match else ""
 
-    # Extract nodes and edges safely
-    data_nodes = llm_output.get('nodes', [])
-    data_edges = llm_output.get('edges', [])
+    # Clean out any accidental ``` fences if present
+    json_str = re.sub(r"```json|```", "", json_str, flags=re.IGNORECASE).strip()
 
-    return data_nodes, data_edges
+    # Parse JSON safely
+    try:
+        kg_data = json.loads(json_str)
+        data_nodes = kg_data.get('nodes', [])
+        data_edges = kg_data.get('edges', [])
+    except json.JSONDecodeError:
+        data_nodes = []
+        data_edges = []
+
+    return reasoning_answer, data_nodes, data_edges
+
+
+def parsed_sql(text):
+    pattern = r"1\. SQL Query:\s*```sql\s*(.*?)\s*```"
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        sql = match.group(1).strip()
+        return sql
+    else:
+        return None
 
 
 def parsed_graph_output(response_text, visualization_type):

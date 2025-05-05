@@ -123,11 +123,7 @@ def prepare_chart_data(df, visualization_type, graph_schema=None):
     elif visualization_type in ["Knowledge Graph", "Causal Graph", "Process Flow"]:
         return {
             "type": visualization_type.lower().replace(' ', '_'),
-            "schema_kg": {
-                "nodes": graph_schema.get("schema_nodes") if graph_schema else [],
-                "edges": graph_schema.get("schema_edges") if graph_schema else []
-            },
-            "data_kg": {
+            "data": {
                 "nodes": graph_schema.get("data_nodes") if graph_schema else [],
                 "edges": graph_schema.get("data_edges") if graph_schema else []
             }

@@ -14,7 +14,9 @@ TABLE_SCHEMAS = {
             "primary_key": "local_authority_code",
             "columns": {
                 "local_authority_code": "VARCHAR(500)",
-                "local_authority_name": "VARCHAR(500)"
+                "local_authority_name": "VARCHAR(500)",
+                "region_name": "VARCHAR(50)",
+                "region_id": "INT4"
             }
         },
         "dim_occupation": {
@@ -40,9 +42,9 @@ TABLE_SCHEMAS = {
                 "industry_code": "INT8"
             },
             "foreign_keys": {
-                "soc_code": "dim_occupation_rows.soc_code",
                 "industry_code": "dim_industry_rows.industry_code",
-                "local_authority_code": "dim_local_authority.local_authority_code"
+                "local_authority_code": "dim_local_authority.local_authority_code",
+                "soc_code": "dim_occupation_rows.soc_code"
             }
         },
         "fact_demographic_automation_rows": {
@@ -83,11 +85,49 @@ TABLE_SCHEMAS = {
                 "industry_code": "dim_industry_rows.industry_code"
             }
         },
+        "ess_survey": {
+            "columns": {
+                "id": "INT4",
+                "year": "INT4",
+                "region_id": "INT4",
+                "sector": "VARCHAR(50)",
+                "org_type": "VARCHAR(128)",
+                "site_type": "VARCHAR(50)",
+                "size_band": "VARCHAR(50)",
+                "job_role_id": "VARCHAR(50)",
+                "age_group": "VARCHAR(50)",
+                "gender": "VARCHAR(50)",
+                "education_level": "VARCHAR(50)",
+                "metric_name": "VARCHAR(50)",
+                "metric_value": "FLOAT4"
+            }
+        },
         "soc_code_skill_training_map": {
             "columns": {
                 "soc_code": "INT8",
                 "skill_category": "VARCHAR(100)",
                 "training_program": "VARCHAR(255)"
+            }
+        },
+        "training_budgets": {
+            "columns": {
+                "id": "INT4",
+                "year": "INT4",
+                "sector": "VARCHAR(50)",
+                "estab_size": "VARCHAR(50)",
+                "employees": "FLOAT4",
+                "trainees": "FLOAT4",
+                "twentytwo_prices_budget_per_employee": "FLOAT4",
+                "twentytwo_prices_budget_per_trainee": "FLOAT4",
+                "twentytwo_prices_budget_total_mn": "FLOAT4"
+            }
+        },
+        "job_risk": {
+            "primary_key": "soc_code",
+            "columns": {
+                "soc_code": "INT8",
+                "job_title": "TEXT",
+                "automation_probability": "FLOAT8"
             }
         },
         "workforce_reskilling_cases": {
@@ -114,7 +154,7 @@ TABLE_SCHEMAS = {
                 "activity": "TEXT",
                 "actor": "TEXT",
                 "skill_category": "TEXT",
-                "score": "NUMERIC",
+                "score": "INT8",
                 "completion_status": "TEXT",
                 "event_id": "INT8",
                 "timestamp": "TIMESTAMP"
