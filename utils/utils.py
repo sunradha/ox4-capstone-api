@@ -54,7 +54,7 @@ def parsed_kg_sql_output(llm_output):
     }
 
     if not llm_output or not isinstance(llm_output, str):
-        raise ValueError("LLM output is empty or invalid.")
+        print("LLM output is empty or invalid.")
 
     # Extract reasoning answer
     reasoning_match = re.search(r'1\.\s*Reasoning Answer:\s*(.*?)(?=2\.\s*SQL Query:)', llm_output, re.DOTALL)

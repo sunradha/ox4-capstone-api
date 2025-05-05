@@ -53,6 +53,8 @@ def run_reasoning_pipeline(question):
             sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
+            print("Nodes SQL : \n", nodes_sql)
+            print("Edges SQL : \n", edges_sql)
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
             edges_df = run_sql_query_postgres(edges_sql) if edges_sql else None
 
@@ -77,6 +79,8 @@ def run_reasoning_pipeline(question):
             sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
+            print("Nodes SQL : \n", nodes_sql)
+            print("Edges SQL : \n", edges_sql)
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
             edges_df = run_sql_query_postgres(edges_sql) if edges_sql else None
 
@@ -129,10 +133,12 @@ def run_reasoning_pipeline(question):
             sql_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)
             sql = parsed_sql(llm_sql_response)
+            print("SQL : \n", sql)
+
             df = run_sql_query_postgres(sql)
 
             if df.empty:
-                raise ValueError("No data returned from database.")
+                print("No data returned from database.")
             df = clean_dataframe_columns(df)
             db_data_json = df.to_json(orient='records')
             graph_schema = process_charts(question, reasoning_type, visualization_type, db_data_json)

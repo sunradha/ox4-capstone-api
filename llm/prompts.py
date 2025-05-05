@@ -186,6 +186,8 @@ User Question: \"{question}\"
 - This guarantees all edges connect to valid nodes and no dangling edges appear.
 
 ⚙️ IMPORTANT SQL RULES:
+- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
+  → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
 - Always generate two separate SQL queries: one for nodes, one for edges.
 - Nodes SQL → always return: node_id, node_label, node_type.
 - Edges SQL → always return: source, target, relationship.
