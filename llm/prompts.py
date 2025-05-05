@@ -311,7 +311,15 @@ User Question: \"{question}\"
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values.
 - Use PostgreSQL-compatible syntax.
-
+- DO NOT use reserved keywords as aliases; use:
+    → doc (dim_occupation)
+    → di (dim_industry)
+    → ep (employee_profile)
+    → dla (dim_local_authority)
+    → wrc (workforce_reskilling_cases)
+    → wre (workforce_reskilling_events)
+    → sstm (soc_code_skill_training_map)
+    
 🆕 ⚙️ ADDITIONAL CG-SPECIFIC RULES:
 - Use meaningful node types (e.g., “factor,” “outcome,” “intervention,” “risk”).
 - Use informative relationship labels (e.g., “causes,” “leads to,” “contributes to,” not just “related to”).
