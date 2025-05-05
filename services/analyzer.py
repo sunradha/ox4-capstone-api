@@ -33,7 +33,7 @@ def run_reasoning_pipeline(question):
 
         reasoning_cat = reasoning_result.get("reasoning_type", "Unknown").strip().capitalize()
         reasoning_justification = reasoning_result.get("reasoning_justification")
-        reasoning_type = f'{reasoning_justification}So this reasoning is of type "{reasoning_cat}"'
+        reasoning_type = f'{reasoning_justification} So this reasoning is of type "{reasoning_cat}"'
         reasoning_path = reasoning_result.get("reasoning_path")
         visualization_type = reasoning_result.get("visualization_type", "").strip()
         print("====================================")
@@ -70,9 +70,9 @@ def run_reasoning_pipeline(question):
 
         return build_response(
             reasoning_type,
+            graph_schema.get("reasoning_answer"),
             reasoning_path,
             sql,
-            graph_schema.get("reasoning_answer"),
             chart_json,
             None
         )
