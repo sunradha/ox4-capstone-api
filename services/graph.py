@@ -24,6 +24,19 @@ def process_knowledge_graph(question, reasoning_type, db_data_json):
 def process_causal_graph(question, reasoning_type, db_data_json):
     data_cg_prompt = get_cg_data_prompt(question, reasoning_type, db_data_json)
     data_cg_response = call_llm(data_cg_prompt)
+    reasoning_answer, data_nodes, data_edges = parsed_kg_data_output(data_cg_response)
+
+    graph_schema = {
+        "reasoning_answer": reasoning_answer,
+        "data_nodes": data_nodes,
+        "data_edges": data_edges
+    }
+    return graph_schema
+
+
+def process_process_flow(question, reasoning_type, db_data_json):
+    data_cg_prompt = get_cg_data_prompt(question, reasoning_type, db_data_json)
+    data_cg_response = call_llm(data_cg_prompt)
     print("Data Response :\n", data_cg_response)
     reasoning_answer, data_nodes, data_edges = parsed_kg_data_output(data_cg_response)
     print("----------------------------------------------------")
@@ -39,30 +52,6 @@ def process_causal_graph(question, reasoning_type, db_data_json):
     }
     return graph_schema
 
-
-def process_process_flow(question, reasoning_type, db_data_json):
-    schema_response = call_llm(get_process_flow_prompt(question, reasoning_type))
-    parsed_schema = parsed_graph_output(schema_response, "Process Flow")
-    sql = parsed_schema.get('generated_sql')
-    process_nodes = parsed_schema['graph_schema'].get('nodes')
-    process_edges = parsed_schema['graph_schema'].get('edges')
-
-    df = run_sql_query_postgres(sql)
-    if df.empty:
-        raise ValueError("No data returned from database.")
-
-    db_data_json = df.to_json(orient='records')
-    data_pf_response = call_llm(get_kg_data_prompt(question, db_data_json))
-    parsed_data_pf = parsed_data_kg_output(data_pf_response)
-
-    graph_schema = {
-        "reasoning_answer": parsed_schema.get('reasoning_answer'),
-        "schema_nodes": process_nodes,
-        "schema_edges": process_edges,
-        "data_nodes": parsed_data_pf.get('nodes'),
-        "data_edges": parsed_data_pf.get('edges')
-    }
-    return graph_schema, df
 
 
 def process_charts(question, reasoning_type, visualization_type, db_data_json):

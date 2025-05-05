@@ -371,6 +371,120 @@ Respond with exactly **two sections**:
 """
 
 
+def get_pf_sql_prompt(question, reasoning_type, visualization_type):
+    return f"""
+You are an expert assistant generating SQL queries for Process Flow or Process Mining visualization.
+
+⚡ IMPORTANT: Only return the final SQL queries. Do NOT include explanations, reasoning, or comments.
+
+Reasoning Type: {reasoning_type}
+Visualization Type: {visualization_type}
+Schemas (use ONLY the tables and columns listed below — do NOT invent new table names or columns):
+{TABLE_SCHEMAS}
+
+User Question: \"{question}\"
+
+⚡ HOW TO THINK BEFORE WRITING SQL:
+1️⃣ Carefully examine the schema.
+- Identify which tables contain **process steps**, **events**, **activities**, or **milestones**.
+- Identify which columns or relationships define the **sequence or order of steps** (e.g., previous_step → next_step, timestamp ordering, transitions).
+
+2️⃣ Classify:
+- Nodes → select columns for node_id, node_label, node_type (e.g., “step”, “activity”, “milestone”).
+- Edges → select pairs for source, target, relationship (e.g., “next”, “transitions_to”, “depends_on”).
+- [Optional] Include flow **counts** if available (e.g., number of times a transition occurred).
+
+3️⃣ Select logically:
+- Only use real columns from the schema.
+- Do not hardcode arbitrary relationships unless they logically fit.
+- If no meaningful transition columns exist, return only the node SQL.
+
+4️⃣ Ensure nodes and edges are aligned:
+- FIRST, write the SQL to select the node set.
+- THEN, write a second SQL to select the edge set, using only node IDs that appear in the first query.
+- This ensures all edges connect valid nodes and avoids dangling edges.
+
+⚙️ IMPORTANT SQL RULES:
+- Always generate two separate SQL queries: one for nodes, one for edges.
+- Nodes SQL → must return: node_id, node_label, node_type.
+- Edges SQL → must return: source, target, relationship, [optional] count.
+- Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
+- Use DISTINCT or GROUP BY to deduplicate results.
+- Apply LIMIT inside each query if needed (e.g., LIMIT 25).
+- Use safe table aliases (avoid reserved words).
+- Use only valid categorical values.
+- Use PostgreSQL-compatible syntax.
+
+⚠️ IMPORTANT OUTPUT FORMAT:
+- Always first output the Nodes SQL, then the Edges SQL.
+- Separate them under clear headers.
+- Example format:
+
+1. Nodes SQL:
+```sql
+<Write the Nodes SQL here>
+2. Edges SQL:
+<Write the Edges SQL here>
+```
+"""
+
+
+def get_pf_data_prompt(question, reasoning_type, db_data_json):
+    return f"""
+You are an expert data analyst and process flow reasoning assistant.
+
+User Question: "{question}"
+Reasoning Type: "{reasoning_type}"
+
+Here is the query result data (in JSON format):
+{db_data_json}
+
+⚡ SCHEMA AND RELATIONSHIPS:
+{TABLE_SCHEMAS}
+
+⚡ TASKS:
+1️⃣ **Reasoning Answer**  
+- Provide a **clear, well-reasoned, insightful answer** to the user question, using the data, the reasoning type, and the schema.
+- Focus on analyzing **the process flow** — explain the key steps, transitions, sequences, bottlenecks, and loops revealed in the data.
+- Highlight important patterns such as:
+    - where processes slow down or fail,
+    - where resources pile up,
+    - which steps are most critical or frequent,
+    - and where improvements can be made.
+- Make sure the explanation is understandable for a non-technical audience and clearly communicates the process logic.
+
+2️⃣ **Process Flow JSON**  
+- Extract unique nodes and edges from the data to build a process flow diagram.
+- Nodes:
+    - id → unique identifier
+    - label → human-readable step name
+    - type → category (e.g., step, decision, milestone, endpoint)
+- Edges:
+    - source → id of the starting step
+    - target → id of the next step
+    - relationship → type of flow (e.g., next, transitions_to, depends_on)
+    - [optional] count → number of times this transition occurs (if available in data)
+
+⚡ OUTPUT FORMAT:
+Respond with exactly **two sections**:
+1. Reasoning Answer:
+<Your detailed process flow answer here>
+
+2. Nodes & Edges JSON:
+{{
+  "nodes": [{{ "id": "node_id", "label": "node_label", "type": "node_type" }}],
+  "edges": [{{ "source": "source_id", "target": "target_id", "relationship": "edge_label" }}]
+}}
+
+⚡ IMPORTANT RULES:
+- Deduplicate nodes and edges — no duplicates.
+- Use simple, clean IDs (no spaces or special characters).
+- Ensure all edge source/target IDs match node IDs.
+- Only create edges when the data shows a valid, meaningful process transition.
+- Do **NOT** include any explanation, notes, or markdown outside the specified format.
+"""
+
+
 def get_reasoning_answer_prompt(question, reasoning_type, visualization_type, db_data_json):
     return f"""
 You are an expert data analyst and reasoning assistant.

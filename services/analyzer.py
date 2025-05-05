@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
 from llm.prompts import *
-from utils.utils import parsed_reasoning_output, parsed_graph_output, parsed_sql, parsed_kg_cg_sql
+from utils.utils import parsed_reasoning_output, parsed_graph_output, parsed_sql, parsed_2sqls
 from services.visualizer import prepare_chart_data
 from services.graph import *
 
@@ -49,7 +49,7 @@ def run_reasoning_pipeline(question):
         if visualization_type == "Knowledge Graph":
             sql_prompt = get_kg_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)
-            sql = parsed_kg_cg_sql(llm_sql_response)
+            sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
@@ -73,7 +73,7 @@ def run_reasoning_pipeline(question):
         elif visualization_type == "Causal Graph":
             sql_prompt = get_cg_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)
-            sql = parsed_kg_cg_sql(llm_sql_response)
+            sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
@@ -97,14 +97,28 @@ def run_reasoning_pipeline(question):
             graph_schema = process_causal_graph(question, reasoning_type, db_data_json)
 
         elif visualization_type == "Process Flow":
-            sql_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
+            sql_prompt = get_pf_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)
-            sql = parsed_sql(llm_sql_response)
-            print("Generated SQL:\n", sql)
-            df = run_sql_query_postgres(sql)
-            if df.empty:
-                raise ValueError("No data returned from database.")
-            df = clean_dataframe_columns(df)
+            sql = parsed_2sqls(llm_sql_response)
+            nodes_sql = sql.get('nodes_sql')
+            edges_sql = sql.get('edges_sql')
+            nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
+            edges_df = run_sql_query_postgres(edges_sql) if edges_sql else None
+
+            if nodes_df is not None and edges_df is not None:
+                source_nodes_df = nodes_df.rename(
+                    columns={'node_id': 'source', 'node_label': 'source_label', 'node_type': 'source_type'})
+                target_nodes_df = nodes_df.rename(
+                    columns={'node_id': 'target', 'node_label': 'target_label', 'node_type': 'target_type'})
+                edges_enriched = edges_df.merge(source_nodes_df, on='source', how='left')
+                edges_enriched = edges_enriched.merge(target_nodes_df, on='target', how='left')
+                df = edges_enriched.drop_duplicates().reset_index(drop=True)
+            elif nodes_df is not None:
+                df = nodes_df.copy()
+            elif edges_df is not None:
+                df = edges_df.copy()
+
+            df = df.head(20)
             db_data_json = df.to_json(orient='records')
             graph_schema = process_process_flow(question, reasoning_type, db_data_json)
 
