@@ -95,9 +95,10 @@ Schemas (use ONLY the tables and columns listed below — do NOT invent new tabl
 User Question: \"{question}\"
 
 ⚡ --- IMPORTANT SQL GENERATION RULES (MUST FOLLOW) --- ⚡
-- ONLY use the table names and columns provided in the schemas above.
+- Only use columns that are explicitly listed in the provided schema.
+- If the schema lacks required columns to create edges (e.g., no employee_id available), explain this in the reasoning and only return node-level results without edges.
 - The SQL MUST be compatible with PostgreSQL dialect.
-- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.  
+- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
   → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
 - When using aggregation:
   - PostgreSQL STRING_AGG syntax: STRING_AGG(expression, ', ' ORDER BY column).
@@ -121,107 +122,114 @@ User Question: \"{question}\"
 - When showing metrics per location/category, apply aggregation (e.g., AVG) and GROUP BY the dimension.
 - Deduplicate using DISTINCT ON, GROUP BY, or ROW_NUMBER() window functions.
 - Apply row limits to avoid clutter:
-    → Bar Chart → LIMIT 10  
-    → Pie Chart → LIMIT 5  
-    → Knowledge Graph / Causal Graph → LIMIT 20–25  
+    → Bar Chart → LIMIT 10
+    → Pie Chart → LIMIT 5
+    → Knowledge Graph / Causal Graph → LIMIT 20–25
     → Time Series → ORDER BY date DESC LIMIT 100
 - Always alias SELECT columns as:
-    - x, y, label (Ranking Chart)
-    - label, value (Pie Chart)
-    - x, y (Time Series Chart)
-    - x, series1, series2, etc. (Comparative Bar Chart)
-    - value (Histogram)
+    - Ranking Chart → x, y, label
+    - Pie Chart → label, value
+    - Time Series → x, y
+    - Comparative Bar Chart → x, series1, series2, etc.
+    - Histogram → value
+    - Knowledge Graph → node_id, node_label, node_type, source, target, relationship
+    - Causal Graph → cause, effect, relationship
 
-**EXAMPLE FOR DEDUPLICATION:**
-SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y  
-FROM fact_geographic_automation_rows fgar  
-JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code  
-ORDER BY dla.local_authority_name, fgar.probability_of_automation DESC  
+**SPECIAL INSTRUCTIONS FOR KNOWLEDGE GRAPH AND CAUSAL GRAPH:**
+- Select both nodes and edges in a single query using `UNION ALL`.
+- Always construct the result with exactly six columns:
+    → node_id, node_label, node_type, source, target, relationship.
+- For node rows:
+    → Populate node_id, node_label, node_type; set source, target, relationship as NULL.
+- For edge rows:
+    → Populate source, target, relationship; set node_id, node_label, node_type as NULL.
+- Alias columns exactly as:
+    → node_id, node_label, node_type, source, target, relationship.
+- For Causal Graph, map cause → source, effect → target, and keep relationship.
+- Explain in the reasoning why you chose these nodes and edges.
+- If the schema lacks foreign keys or edge columns, derive edges logically from data meaning.
+- Example pattern:
+    (SELECT node_id, node_label, node_type, NULL AS source, NULL AS target, NULL AS relationship LIMIT 25)
+    UNION ALL
+    (SELECT NULL AS node_id, NULL AS node_label, NULL AS node_type, source, target, relationship LIMIT 25)
+    
+**EXAMPLES FOR DEDUPLICATION AND GRAPHS:**
+-- Example for Ranking Chart
+SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y
+FROM fact_geographic_automation_rows fgar
+JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code
+ORDER BY dla.local_authority_name, fgar.probability_of_automation DESC
 LIMIT 10;
 
-⚠️ **ALIASING REMINDER:**  
-NEVER use reserved words as table aliases.  
+⚠️ **ALIASING REMINDER:**
+NEVER use reserved words as table aliases.
 → Use aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), `ind` (dim_industry), etc.
 
 Based on the provided Schemas, Reasoning Type, Visualization Type, and User Question, generate the correct SQL query following these rules.
 
 Provide your response in the following exact format:
 
-1. SQL Query:
-```sql
-<Write the SQL query here>
-```
+SQL Query:
+    ```sql
+    <SQL>
+    ```
 """
 
 
 def get_kg_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
-You are an assistant generating SQL queries and Knowledge Graph construction logic.
+You are an expert assistant generating SQL queries for Knowledge Graph (KG) construction.
+
+⚡ IMPORTANT: Only return the final SQL queries. Do NOT include explanations, reasoning, or comments.
 
 Reasoning Type: {reasoning_type}
 Visualization Type: {visualization_type}
-Schemas (use ONLY the tables and columns listed below — do NOT invent new table names):
+Schemas (use ONLY the tables and columns listed below — do NOT invent new table names or columns):
 {TABLE_SCHEMAS}
 
-User Question: "{question}"
+User Question: \"{question}\"
 
-⚡ IMPORTANT RULES:
-- Provide both the conceptual KG schema (based on schema relationships) AND the SQL query.
-- ONLY use the table names and columns provided in the schemas above.
-- Do NOT invent or assume extra columns or labels.
-- Check the schema carefully for data types (e.g., numeric, text, boolean) and apply correct conditions:
-  → For numeric fields like 'score', use numeric comparisons (e.g., WHERE score >= 70), NOT text comparisons (e.g., WHERE score = 'high').
-- The SQL MUST be compatible with PostgreSQL dialect.
-- DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
-  → Instead, use safe, non-reserved short aliases like `doc` for dim_occupation, `dia` for fact_industry_automation_rows, etc.
-- When using aggregation functions:
-  - Always specify the delimiter in STRING_AGG.
-  - PostgreSQL syntax: STRING_AGG(expression, ', ' ORDER BY column).
-  - Do NOT use aggregates in GROUP BY — only in SELECT.
-  - All non-aggregated SELECT columns MUST be in GROUP BY.
-  - When using GROUP BY, any non-grouped columns in SELECT or ORDER BY must be wrapped in aggregate functions (e.g., MAX, MIN).
-- If STRING_AGG or similar is used, apply it in a subquery or CTE.
-- ALWAYS qualify column names with table aliases when joining.
-- Use ROUND(value::numeric, decimal_places) when rounding doubles.
-- Handle division by zero safely using NULLIF.
-- If filtering on boolean/text, apply correct type checks.
-- If required data is missing in the schema, mention this in the reasoning.
-- For deduplication:
-  - Use DISTINCT ON, GROUP BY, or window functions.
-  - When using DISTINCT ON, make sure the ORDER BY clause starts with the same columns used in DISTINCT ON.
-  - When using GROUP BY with ORDER BY, ensure ORDER BY references only grouped or aggregated columns.
-- Alias SQL columns as:
-  node_id, node_label, node_type, source, target, relationship.
-- ALWAYS include both node and edge columns in the final SELECT: node_id, node_label, node_type, source, target, relationship.
-- When using CTEs or subqueries, apply ORDER BY and LIMIT at the outermost SELECT, not inside the CTE, unless explicitly needed.
-- Prefer using DISTINCT ON when you want one representative row per group, and control which row is kept using ORDER BY.
-- Conceptual schema:
-  - Define all unique node types and edge relationships.
-  - Include meaningful edges between entities (e.g., employee → program, skill → program, industry → program) instead of trivial edges (e.g., id → program).
-  - Use the schema’s foreign key relationships or join paths to construct edges:
-    → Example 1: employee_id → training_program with relationship 'enrolled_in'
-    → Example 2: training_program → skill_category with relationship 'requires_skill'
-    → Example 3: industry_code → training_program with relationship 'offers'
-- NEVER leave source, target, or relationship as NULL.
-  → If meaningful edges cannot be determined, explain why in the reasoning section and focus on nodes only.
-- IMPORTANT: To avoid overwhelming the frontend, ALWAYS limit the SQL query to **20-25 rows** using `LIMIT`. Apply a meaningful `ORDER BY` before the `LIMIT` — for example, `ORDER BY score DESC`, `timestamp DESC`, or `random()` if no natural ordering exists.
-- IMPORTANT: If a table lacks natural foreign key relationships, consider deriving edges from data relationships (e.g., high score → training program) and explain this logic clearly in the reasoning section.
+⚡ HOW TO THINK BEFORE WRITING SQL:
+1️⃣ Carefully examine the schema.
+- Identify which tables contain core entities that should become KG nodes (e.g., employees, programs, skills, events).
+- Identify which columns or foreign key relationships can act as edges between those entities (e.g., program → status, employee → department).
 
-⚠️ NOTE: You cannot access real data values — generate the SQL to extract nodes and edges when executed.
+2️⃣ Classify:
+- Nodes → select columns for node_id, node_label, node_type.
+- Edges → select pairs for source, target, relationship.
 
-OUTPUT SECTIONS:
-1. Reasoning Answer:
-<Explain the graph logic and SQL approach>
+3️⃣ Select logically:
+- Only include real columns from the schema.
+- Avoid hardcoding arbitrary edge labels unless they logically fit the schema.
+- If no meaningful edge columns exist, return only the node SQL.
 
-2. SQL Query:
+4️⃣ Ensure nodes and edges are aligned:
+- FIRST, write the SQL to select the node set.
+- THEN, write a second SQL to select the edge set, using only node IDs that appear in the first node query.
+- This guarantees all edges connect to valid nodes and no dangling edges appear.
+
+⚙️ IMPORTANT SQL RULES:
+- Always generate two separate SQL queries: one for nodes, one for edges.
+- Nodes SQL → always return: node_id, node_label, node_type.
+- Edges SQL → always return: source, target, relationship.
+- Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
+- Use DISTINCT or GROUP BY to deduplicate if needed.
+- Apply LIMIT inside each SQL query if necessary (e.g., LIMIT 20).
+- Use safe table aliases (avoid reserved words).
+- Use only valid categorical values (e.g., completion_status: 'Failed', 'Completed').
+- Use PostgreSQL-compatible syntax.
+
+⚠️ IMPORTANT OUTPUT FORMAT:
+- Always first output the Nodes SQL, then the Edges SQL.
+- Separate them under clear headers.
+- Example format:
+
+1. Nodes SQL:
 ```sql
-<SQL query here>
+<Write the Nodes SQL here>
+2. Edges SQL:
+<Write the Edges SQL here>
 ```
-3. Conceptual Knowledge Graph Schema:
-Nodes:
-- <column>: <entity_type>
-Edges:
-- source: <column>, target: <column>, relationship: <relationship_label>
 """
 
 

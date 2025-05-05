@@ -1,5 +1,6 @@
 import re
 import json
+from typing import Optional, Dict
 
 
 def parsed_reasoning_output(llm_output):
@@ -117,6 +118,28 @@ def parsed_kg_data_output(llm_output_str):
         data_edges = []
 
     return reasoning_answer, data_nodes, data_edges
+
+
+def parsed_kg_sql(text: str) -> Dict[str, Optional[str]]:
+    pattern_nodes = r"1\. Nodes SQL:\s*```sql\s*(.*?)\s*```"
+    pattern_edges = r"2\. Edges SQL:\s*```sql\s*(.*?)\s*```"
+
+    nodes_match = re.search(pattern_nodes, text, re.DOTALL | re.IGNORECASE)
+    edges_match = re.search(pattern_edges, text, re.DOTALL | re.IGNORECASE)
+
+    result: Dict[str, Optional[str]] = {}
+
+    if nodes_match:
+        result['nodes_sql'] = nodes_match.group(1).strip()
+    else:
+        result['nodes_sql'] = None
+
+    if edges_match:
+        result['edges_sql'] = edges_match.group(1).strip()
+    else:
+        result['edges_sql'] = None
+
+    return result
 
 
 def parsed_sql(text):
