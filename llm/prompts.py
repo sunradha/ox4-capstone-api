@@ -167,61 +167,49 @@ Schemas (use ONLY the tables and columns listed below — do NOT invent new tabl
 User Question: \"{question}\"
 
 ⚡ HOW TO THINK BEFORE WRITING SQL:
-1️⃣ Carefully examine the schema.
-- Identify which tables contain core entities that should become KG nodes (e.g., industries, occupations, employees, skills, training, local authorities).
-- Identify which columns or foreign key relationships can act as edges between those entities (e.g., employee → occupation, occupation → skill, employee → training, employee → location).
+1️⃣ Examine the schema carefully.
+- Identify core entities for KG nodes (e.g., employees, occupations, industries, skills, training, local authorities).
+- Identify foreign key relationships to act as edges (e.g., employee → occupation → industry, employee → location, employee → training → skill).
 
-2️⃣ Classify:
-- Nodes → select columns for node_id, node_label, node_type.
-- Edges → select pairs for source, target, relationship.
+2️⃣ Create multi-level joins:
+- Use JOINs across 3–4 tables when possible to generate multi-hop paths.
+- Example: employee → occupation → industry → local authority.
 
-3️⃣ Select logically:
-- Only include real columns from the schema.
-- Avoid hardcoding arbitrary edge labels unless they logically fit the schema.
-- Use JOINs across related tables to reveal meaningful relationships.
-- If no meaningful edge columns exist, return only the node SQL.
+3️⃣ Extract diverse relationship types:
+- Include multiple edge types:
+    - HAS_OCCUPATION (employee → occupation)
+    - BELONGS_TO_SECTOR (occupation → industry)
+    - LOCATED_IN (employee → local authority)
+    - TRAINS_FOR (employee → skill)
+    - FUNDED_BY (skill → training program)
 
-4️⃣ Ensure nodes and edges are aligned:
-- FIRST, write the SQL to select the node set.
-- THEN, write a second SQL to select the edge set, using only node IDs that appear in the first node query.
-- This guarantees all edges connect valid nodes and no dangling edges appear.
+4️⃣ Enrich node labels:
+- Add details like sector, skill category, or location to node labels when possible.
 
-⚠️ ALIAS RULES (STRICT):
-- DO NOT use reserved keywords as table aliases.
-- ALWAYS use these safe aliases:
-    → dim_occupation → doc
-    → dim_industry → di
-    → fact_industry_automation_rows → fia
-    → dim_local_authority → dla
-    → employee_profile → ep
-    → workforce_reskilling_cases → wrc
-    → workforce_reskilling_events → wre
-    → soc_code_skill_training_map → sstm
-
-⚠️ NODE ID RULE:
-- Prefix node IDs to ensure global uniqueness:
+⚙️ SQL RULES:
+- Always generate two separate SQL queries: one for nodes, one for edges.
+- Nodes SQL → return: node_id, node_label, node_type.
+- Edges SQL → return: source, target, relationship.
+- Prefix node IDs:
     → 'IND_' || CAST(di.industry_code AS TEXT)
     → 'OCC_' || CAST(doc.soc_code AS TEXT)
     → 'EMP_' || CAST(ep.employee_id AS TEXT)
     → 'LOC_' || CAST(dla.local_authority_code AS TEXT)
     → 'SKILL_' || sstm.skill_category
     → 'TRAIN_' || sstm.training_program
-
-⚙️ IMPORTANT SQL RULES:
-- Always generate two separate SQL queries: one for nodes, one for edges.
-- Nodes SQL → must return: node_id, node_label, node_type.
-- Edges SQL → must return: source, target, relationship.
-- Explicitly CAST node_id, source, and target to TEXT.
 - Use DISTINCT or GROUP BY to deduplicate.
 - Apply LIMIT (e.g., LIMIT 15) if needed.
-- Use only valid categorical values (e.g., completion_status: 'Failed', 'Completed').
 - Use PostgreSQL-compatible syntax.
+- DO NOT use reserved keywords as aliases; use:
+    → doc (dim_occupation)
+    → di (dim_industry)
+    → ep (employee_profile)
+    → dla (dim_local_authority)
+    → wrc (workforce_reskilling_cases)
+    → wre (workforce_reskilling_events)
+    → sstm (soc_code_skill_training_map)
 
-⚠️ IMPORTANT OUTPUT FORMAT:
-- Always first output the Nodes SQL, then the Edges SQL.
-- Separate them under clear headers.
-- Example format:
-
+⚠️ OUTPUT FORMAT:
 1. Nodes SQL:
 ```sql
 <Write the Nodes SQL here>
@@ -245,26 +233,30 @@ Here is the query result data (in JSON format):
 {TABLE_SCHEMAS}
 
 ⚡ TASKS:
-1️⃣ **Reasoning Answer**  
-- Provide a **detailed, insightful answer** to the user question based on the data, the reasoning type, and the schema.
-- Explain key patterns, trends, relationships, and important insights you can extract from the data.
-- Highlight meaningful relationships between entities (for example, which industries are most impacted, which regions stand out, key connections between occupations and risk, etc.).
-- Make the explanation easy to understand for a non-technical user.
+1️⃣ Reasoning Answer:
+- Provide a **detailed, insightful answer** to the user question, using the data, the reasoning type, and the schema.
+- Highlight key patterns, trends, and relationships.
+- Explain both direct and indirect relationships (e.g., employee → occupation → industry).
+- Make the explanation understandable for a non-technical audience.
 
-2️⃣ **Knowledge Graph JSON**  
-- Extract unique nodes and edges from the data.
-- Use the schema and relationships to infer meaningful edges — only create edges when data shows a clear relationship or when the schema defines a known connection.
-- For each node, include:
-    - id → unique identifier
-    - label → human-readable name
-    - type → category of node (e.g., industry, region, job, person, etc.)
-- For each edge, include:
-    - source → id of source node
-    - target → id of target node
-    - relationship → type of connection between source and target
+2️⃣ Knowledge Graph JSON:
+- Extract unique nodes and edges.
+- Use the schema to infer direct and indirect edges:
+    → Example: if you have employee → occupation → industry, also add employee → industry.
+- Include diverse relationship types:
+    → HAS_OCCUPATION, BELONGS_TO_SECTOR, LOCATED_IN, TRAINS_FOR, FUNDED_BY, WORKS_IN.
+- For each node:
+    → id → unique identifier
+    → label → human-readable name (add sector, skill, or location when possible)
+    → type → entity type (e.g., employee, occupation, industry, location)
+- For each edge:
+    → source → id of source node
+    → target → id of target node
+    → relationship → type of connection
 
 ⚡ OUTPUT FORMAT:
-Respond with exactly **two sections**:
+Respond with exactly two sections:
+
 1. Reasoning Answer:
 <Your detailed answer here>
 
@@ -275,17 +267,18 @@ Respond with exactly **two sections**:
 }}
 
 ⚡ IMPORTANT RULES:
-- Deduplicate nodes and edges — no duplicates.
-- Use simple, clean IDs (no spaces or special characters).
-- Ensure all edge source/target IDs match node IDs.
-- Do **NOT** include any explanation, notes, or markdown outside the specified format.
+- Deduplicate nodes and edges.
+- Use clean IDs (no spaces or special characters).
+- Ensure edge source/target IDs match node IDs.
+- Add cross-cluster connections to increase graph density.
+- Do NOT include markdown or explanation outside the specified sections.
 """
 
 
 # Dedicated Prompt for Causal Graph
 def get_cg_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
-You are an expert assistant generating SQL queries for Causal Graph construction.
+You are an expert assistant generating SQL queries for Causal Graph (CG) construction.
 
 ⚡ IMPORTANT: Only return the final SQL queries. Do NOT include explanations, reasoning, or comments.
 
@@ -302,13 +295,13 @@ User Question: \"{question}\"
 - Identify which columns or relationships suggest causal links (e.g., cause → effect, predictor → outcome, intervention → result).
 
 2️⃣ Classify:
-- Nodes → select columns for node_id, node_label, node_type (e.g., “cause”, “effect”, “factor”).
-- Edges → select pairs for source, target, relationship (e.g., “causes”, “contributes to”, “impacts”).
+- Nodes → select columns for node_id, node_label, node_type (e.g., “cause”, “effect”, “factor”, “outcome”).
+- Edges → select pairs for source, target, relationship (e.g., “causes”, “contributes to”, “impacts”, “leads to”).
 
 3️⃣ Select logically:
 - Only use real columns from the schema.
-- Do not hardcode arbitrary relationships unless they logically fit.
-- If no meaningful causal relationships are in the schema, return only the node SQL.
+- Avoid hardcoding arbitrary relationships unless they logically fit and are supported by data.
+- If no meaningful causal relationships exist in the schema, return only the node SQL.
 
 4️⃣ Ensure nodes and edges are aligned:
 - FIRST, write the SQL to select the node set.
@@ -321,10 +314,15 @@ User Question: \"{question}\"
 - Edges SQL → must return: source, target, relationship.
 - Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
 - Use DISTINCT or GROUP BY to deduplicate results.
-- Apply LIMIT inside each query if needed (e.g., LIMIT 25).
+- Apply LIMIT inside each query if needed (e.g., LIMIT 15).
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values.
-- Use PostgresSQL-compatible syntax.
+- Use PostgreSQL-compatible syntax.
+
+🆕 ⚙️ ADDITIONAL CG-SPECIFIC RULES:
+- Use meaningful node types (e.g., “factor,” “outcome,” “intervention,” “risk”).
+- Use informative relationship labels (e.g., “causes,” “leads to,” “contributes to,” not just “related to”).
+- Prioritize high-impact or frequently occurring cause-effect pairs when limiting rows.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
@@ -354,22 +352,22 @@ Here is the query result data (in JSON format):
 {TABLE_SCHEMAS}
 
 ⚡ TASKS:
-1️⃣ **Reasoning Answer**  
+1️⃣ **Reasoning Answer**
 - Provide a **clear, well-reasoned, insightful answer** to the user question, using the data, the reasoning type, and the schema.
 - Focus on identifying **causal relationships** — explain what factors cause or influence what outcomes.
-- Highlight key cause-effect patterns, drivers, impacts, and dependencies revealed in the data.
-- Make sure the explanation is easy to understand for a non-technical user and clearly communicates the causal reasoning.
+- Highlight key cause-effect patterns, drivers, impacts, risk factors, and dependencies revealed in the data.
+- Make sure the explanation is easy to understand for a non-technical user and clearly communicates the causal insights.
 
-2️⃣ **Causal Graph JSON**  
+2️⃣ **Causal Graph JSON**
 - Extract unique nodes and edges from the data to build a causal graph.
 - Nodes:
-    - id → unique identifier
+    - id → unique identifier (simple, clean, no spaces or special characters)
     - label → human-readable name
-    - type → category (e.g., cause, effect, factor, outcome)
+    - type → meaningful category (e.g., factor, outcome, intervention, risk, cause, effect)
 - Edges:
     - source → id of the cause node
     - target → id of the effect node
-    - relationship → type of causal link (e.g., causes, contributes to, influences, drives)
+    - relationship → type of causal link (e.g., causes, leads to, contributes to, increases, decreases)
 
 ⚡ OUTPUT FORMAT:
 Respond with exactly **two sections**:
@@ -387,6 +385,7 @@ Respond with exactly **two sections**:
 - Use simple, clean IDs (no spaces or special characters).
 - Ensure all edge source/target IDs match node IDs.
 - Only create edges when the data shows a valid, meaningful causal relationship.
+- Use precise, insightful relationship labels (avoid vague terms like “related to”).
 - Do **NOT** include any explanation, notes, or markdown outside the specified format.
 """
 
