@@ -168,8 +168,8 @@ User Question: \"{question}\"
 
 ⚡ HOW TO THINK BEFORE WRITING SQL:
 1️⃣ Carefully examine the schema.
-- Identify which tables contain core entities that should become KG nodes (e.g., employees, programs, skills, events).
-- Identify which columns or foreign key relationships can act as edges between those entities (e.g., program → status, employee → department).
+- Identify which tables contain core entities that should become KG nodes (e.g., industries, occupations, employees, skills, training, local authorities).
+- Identify which columns or foreign key relationships can act as edges between those entities (e.g., employee → occupation, occupation → skill, employee → training, employee → location).
 
 2️⃣ Classify:
 - Nodes → select columns for node_id, node_label, node_type.
@@ -178,12 +178,13 @@ User Question: \"{question}\"
 3️⃣ Select logically:
 - Only include real columns from the schema.
 - Avoid hardcoding arbitrary edge labels unless they logically fit the schema.
+- Use JOINs across related tables to reveal meaningful relationships.
 - If no meaningful edge columns exist, return only the node SQL.
 
 4️⃣ Ensure nodes and edges are aligned:
 - FIRST, write the SQL to select the node set.
 - THEN, write a second SQL to select the edge set, using only node IDs that appear in the first node query.
-- This guarantees all edges connect to valid nodes and no dangling edges appear.
+- This guarantees all edges connect valid nodes and no dangling edges appear.
 
 ⚠️ ALIAS RULES (STRICT):
 - DO NOT use reserved keywords as table aliases.
@@ -195,22 +196,24 @@ User Question: \"{question}\"
     → employee_profile → ep
     → workforce_reskilling_cases → wrc
     → workforce_reskilling_events → wre
+    → soc_code_skill_training_map → sstm
 
-⚠️ NODE MERGING RULE:
-- Only combine node sets using UNION if they represent similar entity types.
-- When merging unrelated node types (e.g., industry + occupation + risk), prefix node_id values to make them globally unique:
+⚠️ NODE ID RULE:
+- Prefix node IDs to ensure global uniqueness:
     → 'IND_' || CAST(di.industry_code AS TEXT)
     → 'OCC_' || CAST(doc.soc_code AS TEXT)
-    → 'RISK_' || CAST(fia.industry_code AS TEXT)
-- If merging leads to messy results, return only the most relevant node type.
+    → 'EMP_' || CAST(ep.employee_id AS TEXT)
+    → 'LOC_' || CAST(dla.local_authority_code AS TEXT)
+    → 'SKILL_' || sstm.skill_category
+    → 'TRAIN_' || sstm.training_program
 
 ⚙️ IMPORTANT SQL RULES:
 - Always generate two separate SQL queries: one for nodes, one for edges.
 - Nodes SQL → must return: node_id, node_label, node_type.
 - Edges SQL → must return: source, target, relationship.
-- Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
-- Use DISTINCT or GROUP BY to deduplicate if needed.
-- Apply LIMIT inside each SQL query if necessary (e.g., LIMIT 20).
+- Explicitly CAST node_id, source, and target to TEXT.
+- Use DISTINCT or GROUP BY to deduplicate.
+- Apply LIMIT (e.g., LIMIT 15) if needed.
 - Use only valid categorical values (e.g., completion_status: 'Failed', 'Completed').
 - Use PostgreSQL-compatible syntax.
 
