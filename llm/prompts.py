@@ -1,4 +1,3 @@
-import textwrap
 from db.schemas import TABLE_SCHEMAS
 
 
@@ -93,11 +92,11 @@ User Question: \"{question}\"
 ⚡ --- IMPORTANT SQL GENERATION RULES (MUST FOLLOW) --- ⚡
 - Only use columns that are explicitly listed in the provided schema.
 - If the schema lacks required columns to create edges (e.g., no employee_id available), only return node-level results without edges.
-- The SQL MUST be compatible with PostgreSQL dialect.
+- The SQL MUST be compatible with PostgresSQL dialect.
 - DO NOT use reserved keywords like `do`, `from`, `select`, `where`, `order`, `limit`, `group`, `by`, `table`, `user` as table aliases.
   → Use safe short aliases like `doc` (dim_occupation), `dia` (fact_industry_automation_rows), etc.
 - When using aggregation:
-  - PostgreSQL STRING_AGG syntax: STRING_AGG(expression, ', ' ORDER BY column).
+  - PostgresSQL STRING_AGG syntax: STRING_AGG(expression, ', ' ORDER BY column).
   - Columns outside aggregate functions MUST be included in GROUP BY.
 - ALWAYS qualify column names with table aliases when joining tables.
 - Use ROUND(value::numeric, decimal_places) when rounding.
@@ -195,7 +194,7 @@ User Question: \"{question}\"
 - Apply LIMIT inside each SQL query if necessary (e.g., LIMIT 20).
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values (e.g., completion_status: 'Failed', 'Completed').
-- Use PostgreSQL-compatible syntax.
+- Use PostgresSQL-compatible syntax.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
@@ -304,7 +303,7 @@ User Question: \"{question}\"
 - Apply LIMIT inside each query if needed (e.g., LIMIT 25).
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values.
-- Use PostgreSQL-compatible syntax.
+- Use PostgresSQL-compatible syntax.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
@@ -413,7 +412,7 @@ User Question: \"{question}\"
 - Apply LIMIT inside each query if needed (e.g., LIMIT 25).
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values.
-- Use PostgreSQL-compatible syntax.
+- Use PostgresSQL-compatible syntax.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.

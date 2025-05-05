@@ -221,5 +221,3 @@ TABLE_SCHEMAS = {
         }
     ]
 }
-
-

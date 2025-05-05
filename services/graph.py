@@ -46,6 +46,7 @@ def process_charts(question, reasoning_type, visualization_type, db_data_json):
     llm_graph_prompt = get_reasoning_answer_prompt(question, reasoning_type, visualization_type, db_data_json)
     llm_response = call_llm(llm_graph_prompt)
     reasoning_answer = parse_final_answer_response(llm_response)
+
     graph_schema = {
         "reasoning_answer": reasoning_answer,
         "data_nodes": None,
