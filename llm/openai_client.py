@@ -15,7 +15,7 @@ def call_llm(prompt):
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2
+            temperature=0
         )
         reply = response['choices'][0]['message']['content'].strip()
         return reply
