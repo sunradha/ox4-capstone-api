@@ -120,7 +120,7 @@ def parsed_kg_data_output(llm_output_str):
     return reasoning_answer, data_nodes, data_edges
 
 
-def parsed_kg_sql(text: str) -> Dict[str, Optional[str]]:
+def parsed_kg_cg_sql(text: str) -> Dict[str, Optional[str]]:
     pattern_nodes = r"1\. Nodes SQL:\s*```sql\s*(.*?)\s*```"
     pattern_edges = r"2\. Edges SQL:\s*```sql\s*(.*?)\s*```"
 

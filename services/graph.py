@@ -1,7 +1,8 @@
 from db.client import run_sql_query_postgres
 from llm.openai_client import call_llm
 from db.schemas import TABLE_SCHEMAS
-from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt, get_reasoning_answer_prompt
+from llm.prompts import get_kg_sql_prompt, get_kg_data_prompt, get_sql_prompt, get_reasoning_answer_prompt, \
+    get_cg_data_prompt
 from utils.utils import parsed_graph_output, parsed_kg_sql_output, clean_dataframe_columns, parsed_kg_data_output, \
     parse_final_answer_response
 
@@ -10,8 +11,21 @@ def process_knowledge_graph(question, reasoning_type, db_data_json):
 
     data_kg_prompt = get_kg_data_prompt(question, reasoning_type, db_data_json)
     data_kg_response = call_llm(data_kg_prompt)
-    print("Data Response :\n", data_kg_response)
     reasoning_answer, data_nodes, data_edges = parsed_kg_data_output(data_kg_response)
+
+    graph_schema = {
+        "reasoning_answer": reasoning_answer,
+        "data_nodes": data_nodes,
+        "data_edges": data_edges
+    }
+    return graph_schema
+
+
+def process_causal_graph(question, reasoning_type, db_data_json):
+    data_cg_prompt = get_cg_data_prompt(question, reasoning_type, db_data_json)
+    data_cg_response = call_llm(data_cg_prompt)
+    print("Data Response :\n", data_cg_response)
+    reasoning_answer, data_nodes, data_edges = parsed_kg_data_output(data_cg_response)
     print("----------------------------------------------------")
     print(reasoning_answer)
     print(data_nodes)
@@ -24,32 +38,6 @@ def process_knowledge_graph(question, reasoning_type, db_data_json):
         "data_edges": data_edges
     }
     return graph_schema
-
-
-def process_causal_graph(question, reasoning_type, visualization_type):
-    schema_response = call_llm(get_cg_sql_prompt(question, reasoning_type, visualization_type))
-    parsed_schema = parsed_graph_output(schema_response, visualization_type)
-    sql = parsed_schema.get('generated_sql')
-    cause_nodes = parsed_schema['graph_schema'].get('cause_nodes')
-    effect_nodes = parsed_schema['graph_schema'].get('effect_nodes')
-    causal_edges = parsed_schema['graph_schema'].get('causal_edges')
-
-    df = run_sql_query_postgres(sql)
-    if df.empty:
-        raise ValueError("No data returned from database.")
-
-    db_data_json = df.to_json(orient='records')
-    data_cg_response = call_llm(get_kg_data_prompt(question, db_data_json))
-    parsed_data_cg = parsed_data_kg_output(data_cg_response)
-
-    graph_schema = {
-        "reasoning_answer": parsed_schema.get('reasoning_answer'),
-        "schema_nodes": cause_nodes + effect_nodes,
-        "schema_edges": causal_edges,
-        "data_nodes": parsed_data_cg.get('nodes'),
-        "data_edges": parsed_data_cg.get('edges')
-    }
-    return graph_schema, df
 
 
 def process_process_flow(question, reasoning_type, db_data_json):

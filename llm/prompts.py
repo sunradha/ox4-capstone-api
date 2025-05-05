@@ -79,10 +79,6 @@ def get_process_flow_prompt(question, reasoning_type):
     """
 
 
-def get_custom_prompt(question, reasoning_type, visualization_type):
-    pass
-
-
 def get_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
 You are an assistant generating only SQL queries (no Python code, no explanations, no reasoning text) based on the reasoning type and visualization type.
@@ -269,42 +265,109 @@ Respond with exactly **two sections**:
 # Dedicated Prompt for Causal Graph
 def get_cg_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
-You are an assistant generating SQL queries and Causal Graph construction logic.
+You are an expert assistant generating SQL queries for Causal Graph construction.
+
+⚡ IMPORTANT: Only return the final SQL queries. Do NOT include explanations, reasoning, or comments.
 
 Reasoning Type: {reasoning_type}
 Visualization Type: {visualization_type}
-Schemas:
+Schemas (use ONLY the tables and columns listed below — do NOT invent new table names or columns):
 {TABLE_SCHEMAS}
 
-User Question: "{question}"
+User Question: \"{question}\"
 
-⚡ IMPORTANT:
+⚡ HOW TO THINK BEFORE WRITING SQL:
+1️⃣ Carefully examine the schema.
+- Identify which tables contain potential causal entities (e.g., factors, drivers, events, outcomes).
+- Identify which columns or relationships suggest causal links (e.g., cause → effect, predictor → outcome, intervention → result).
 
-Return all cause and effect columns explicitly.
+2️⃣ Classify:
+- Nodes → select columns for node_id, node_label, node_type (e.g., “cause”, “effect”, “factor”).
+- Edges → select pairs for source, target, relationship (e.g., “causes”, “contributes to”, “impacts”).
 
-Alias final columns as: cause, effect, relationship.
+3️⃣ Select logically:
+- Only use real columns from the schema.
+- Do not hardcode arbitrary relationships unless they logically fit.
+- If no meaningful causal relationships are in the schema, return only the node SQL.
 
-Explain joins and relationships in the reasoning.
+4️⃣ Ensure nodes and edges are aligned:
+- FIRST, write the SQL to select the node set.
+- THEN, write a second SQL to select the edge set, using only node IDs that appear in the first query.
+- This ensures all edges connect valid nodes and avoids dangling edges.
 
-Provide your response in this format:
+⚙️ IMPORTANT SQL RULES:
+- Always generate two separate SQL queries: one for nodes, one for edges.
+- Nodes SQL → must return: node_id, node_label, node_type.
+- Edges SQL → must return: source, target, relationship.
+- Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
+- Use DISTINCT or GROUP BY to deduplicate results.
+- Apply LIMIT inside each query if needed (e.g., LIMIT 25).
+- Use safe table aliases (avoid reserved words).
+- Use only valid categorical values.
+- Use PostgreSQL-compatible syntax.
 
-Reasoning Answer:
+⚠️ IMPORTANT OUTPUT FORMAT:
+- Always first output the Nodes SQL, then the Edges SQL.
+- Separate them under clear headers.
+- Example format:
 
-<Explain the query and causal logic>
-SQL Query:
+1. Nodes SQL:
 ```sql
-<SQL query to fetch the required data — include all cause and effect columns explicitly>
+<Write the Nodes SQL here>
+2. Edges SQL:
+<Write the Edges SQL here>
 ```
+"""
 
-3. Causal Graph Schema:
-Cause Nodes:
-- <column_name>: <cause_type>
-Effect Nodes:
-- <column_name>: <effect_type>
-Causal Edges:
-- source: <cause_column>
-  target: <effect_column>
-  relationship: "causes" or other appropriate label
+
+def get_cg_data_prompt(question, reasoning_type, db_data_json):
+    return f"""
+You are an expert data analyst and causal reasoning assistant.
+
+User Question: "{question}"
+Reasoning Type: "{reasoning_type}"
+
+Here is the query result data (in JSON format):
+{db_data_json}
+
+⚡ SCHEMA AND RELATIONSHIPS:
+{TABLE_SCHEMAS}
+
+⚡ TASKS:
+1️⃣ **Reasoning Answer**  
+- Provide a **clear, well-reasoned, insightful answer** to the user question, using the data, the reasoning type, and the schema.
+- Focus on identifying **causal relationships** — explain what factors cause or influence what outcomes.
+- Highlight key cause-effect patterns, drivers, impacts, and dependencies revealed in the data.
+- Make sure the explanation is easy to understand for a non-technical user and clearly communicates the causal reasoning.
+
+2️⃣ **Causal Graph JSON**  
+- Extract unique nodes and edges from the data to build a causal graph.
+- Nodes:
+    - id → unique identifier
+    - label → human-readable name
+    - type → category (e.g., cause, effect, factor, outcome)
+- Edges:
+    - source → id of the cause node
+    - target → id of the effect node
+    - relationship → type of causal link (e.g., causes, contributes to, influences, drives)
+
+⚡ OUTPUT FORMAT:
+Respond with exactly **two sections**:
+1. Reasoning Answer:
+<Your detailed causal answer here>
+
+2. Nodes & Edges JSON:
+{{
+  "nodes": [{{ "id": "node_id", "label": "node_label", "type": "node_type" }}],
+  "edges": [{{ "source": "source_id", "target": "target_id", "relationship": "edge_label" }}]
+}}
+
+⚡ IMPORTANT RULES:
+- Deduplicate nodes and edges — no duplicates.
+- Use simple, clean IDs (no spaces or special characters).
+- Ensure all edge source/target IDs match node IDs.
+- Only create edges when the data shows a valid, meaningful causal relationship.
+- Do **NOT** include any explanation, notes, or markdown outside the specified format.
 """
 
 
@@ -341,5 +404,3 @@ Final Answer:
 - Do **NOT** include markdown, bullet points, or formatting outside the specified section.
 - Do **NOT** include any code, SQL, or comments.
 """
-
-
