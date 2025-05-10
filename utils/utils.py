@@ -121,20 +121,12 @@ def parsed_kg_data_output(llm_output_str):
 
 
 def parsed_2sqls(text: str) -> Dict[str, Optional[str]]:
-    # Normalize triple backtick blocks
-    cleaned_text = re.sub(r"```sql\s*", "", text, flags=re.IGNORECASE)
-    cleaned_text = re.sub(r"```", "", cleaned_text)
-
-    # Regex to extract Nodes and Edges SQL blocks
-    pattern_nodes = r"1\. Nodes SQL:\s*(SELECT[\s\S]*?)(?=\n2\. Edges SQL:|\Z)"
-    pattern_edges = r"2\. Edges SQL:\s*(SELECT[\s\S]*)"
-
-    nodes_match = re.search(pattern_nodes, cleaned_text, re.IGNORECASE)
-    edges_match = re.search(pattern_edges, cleaned_text, re.IGNORECASE)
+    # Extract all SQL blocks inside triple backticks with optional 'sql' language tag
+    sql_blocks = re.findall(r"```(?:sql)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
 
     result: Dict[str, Optional[str]] = {
-        "nodes_sql": nodes_match.group(1).strip() if nodes_match else None,
-        "edges_sql": edges_match.group(1).strip() if edges_match else None,
+        "nodes_sql": sql_blocks[0].strip() if len(sql_blocks) > 0 else None,
+        "edges_sql": sql_blocks[1].strip() if len(sql_blocks) > 1 else None,
     }
 
     return result
