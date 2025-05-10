@@ -121,23 +121,22 @@ def parsed_kg_data_output(llm_output_str):
 
 
 def parsed_2sqls(text: str) -> Dict[str, Optional[str]]:
-    pattern_nodes = r"1\. Nodes SQL:\s*```sql\s*(.*?)\s*```"
-    pattern_edges = r"2\. Edges SQL:\s*```sql\s*(.*?)\s*```"
+    # Strip outer triple backticks if present
+    if text.startswith("```") and text.endswith("```"):
+        text = text.strip("```").strip()
+        if text.startswith("sql"):
+            text = text[3:].strip()  # Remove the 'sql' prefix if present
+
+    pattern_nodes = r"1\. Nodes SQL:\s*SELECT.*?;.*?(?=\n2\. Edges SQL:)"
+    pattern_edges = r"2\. Edges SQL:\s*SELECT.*"
 
     nodes_match = re.search(pattern_nodes, text, re.DOTALL | re.IGNORECASE)
     edges_match = re.search(pattern_edges, text, re.DOTALL | re.IGNORECASE)
 
-    result: Dict[str, Optional[str]] = {}
-
-    if nodes_match:
-        result['nodes_sql'] = nodes_match.group(1).strip()
-    else:
-        result['nodes_sql'] = None
-
-    if edges_match:
-        result['edges_sql'] = edges_match.group(1).strip()
-    else:
-        result['edges_sql'] = None
+    result: Dict[str, Optional[str]] = {
+        "nodes_sql": nodes_match.group(0).split("1. Nodes SQL:")[-1].strip() if nodes_match else None,
+        "edges_sql": edges_match.group(0).split("2. Edges SQL:")[-1].strip() if edges_match else None,
+    }
 
     return result
 
