@@ -124,10 +124,12 @@ User Question: \"{question}\"
     → Pie Chart → LIMIT 5
     → Knowledge Graph / Causal Graph → LIMIT 20–25
     → Time Series → ORDER BY date DESC LIMIT 100
+    → Multi-Series Time Series Chart → ORDER BY x ASC LIMIT 100
 - Always alias SELECT columns as:
     - Ranking Chart → x, y, label
     - Pie Chart → label, value
     - Time Series → x, y
+    - Multi-Series Time Series Chart → x, y, series
     - Comparative Bar Chart → x, series1, series2, etc.
     - Histogram → value
     - Knowledge Graph → node_id, node_label, node_type, source, target, relationship
