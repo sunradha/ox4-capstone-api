@@ -129,6 +129,20 @@ def run_reasoning_pipeline(question):
             db_data_json = df.to_json(orient='records')
             graph_schema = process_process_flow(question, reasoning_type, db_data_json)
 
+        elif visualization_type == "Multi-Series Time Series Chart":
+            sql_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
+            llm_sql_response = call_llm(sql_prompt)
+            sql = parsed_sql(llm_sql_response)
+            print("SQL : \n", sql)
+
+            df = run_sql_query_postgres(sql)
+
+            if df.empty:
+                print("No data returned from database.")
+            df = clean_dataframe_columns(df)
+            db_data_json = df.to_json(orient='records')
+            graph_schema = process_charts(question, reasoning_type, visualization_type, db_data_json)
+
         else:
             sql_prompt = get_sql_prompt(question, reasoning_type, visualization_type)
             llm_sql_response = call_llm(sql_prompt)

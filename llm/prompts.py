@@ -29,7 +29,8 @@ def get_reasoning_prompt(question):
     Visualization Recommendation
     Based on the reasoning type, data relationships, and question goal, recommend the most suitable visualization type.
     Choose from:
-    [Knowledge Graph, Causal Graph, Process Flow, Time Series Chart, Comparative Bar Chart, Ranking Chart, Pie Chart, Histogram]
+    [Knowledge Graph, Causal Graph, Process Flow, Time Series Chart, Comparative Bar Chart, Ranking Chart, Pie Chart, Histogram,
+    Multi-Series Time Series Chart]
 
     For the Visualization Type, briefly include key axis, nodes, or segment details in parentheses. Example:
     Visualization Type: Comparative Bar Chart (X axis - job roles grouped by industry; Y axis - automation risk level)

@@ -1,3 +1,5 @@
+import numpy as np
+
 
 def prepare_chart_data(df, visualization_type, graph_schema=None):
     def safe_get(col_name):
@@ -56,6 +58,32 @@ def prepare_chart_data(df, visualization_type, graph_schema=None):
                 "edges": graph_schema.get("data_edges") if graph_schema else []
             }
         }
+    elif visualization_type == "Multi-Series Time Series Chart":
+        if not df.empty:
+            # Step 1: Identify top 5 categories based on total 'y' value
+            top_categories = (
+                df.groupby("series")["y"]
+                .sum()
+                .sort_values(ascending=False)
+                .head(5)
+                .index.tolist()
+            )
+
+            # Step 2: Filter only those top 5 categories
+            df = df[df["series"].isin(top_categories)]
+
+            # Step 3: Pivot to wide format for multi-series chart
+            pivot_df = df.pivot(index="x", columns="series", values="y").reset_index()
+            pivot_df.columns.name = None  # Remove column grouping label
+
+            # Step 4: Clean non-finite values
+            pivot_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+            pivot_df = pivot_df.where(pivot_df.notnull(), None)
+
+            return {
+                "type": visualization_type.lower().replace(' ', '_'),
+                "data": pivot_df.to_dict(orient="records")
+            }
     else:
         return {
             "type": "table",
