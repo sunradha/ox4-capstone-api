@@ -101,6 +101,7 @@ User Question: \"{question}\"
 - ALWAYS qualify column names with table aliases when joining tables.
 - Use ROUND(value::numeric, decimal_places) when rounding.
 - Handle division by zero using NULLIF.
+- When calculating date differences between two DATE columns, subtract directly (e.g., `end_date - start_date`) to get day counts. Do NOT use EXTRACT(EPOCH) unless working with TIMESTAMP or INTERVAL types.
 - Do NOT assume or invent additional columns.
 - If required data is missing in the schema, only return valid SQL using available data.
 
@@ -111,6 +112,7 @@ User Question: \"{question}\"
 - If the user question uses qualitative words (like “difficult”) that don’t directly match a column value:
     → Map to the closest valid value **only if logical** (e.g., “difficult” → 'Failed')
     → Or skip the filter.
+- When using any column in the SELECT clause as `label`, `node_label`, `source`, or `target`, you MUST add `WHERE <column> IS NOT NULL` to exclude NULL values from charts and graphs.
 
 **RULES FOR VISUALIZATION:**
 - When querying local_authority_code, JOIN dim_local_authority and SELECT dim_local_authority.local_authority_name AS label.
@@ -135,6 +137,7 @@ User Question: \"{question}\"
 SELECT DISTINCT ON (dla.local_authority_name) dla.local_authority_name AS label, fgar.probability_of_automation AS y
 FROM fact_geographic_automation_rows fgar
 JOIN dim_local_authority dla ON fgar.local_authority_code = dla.local_authority_code
+WHERE dla.local_authority_name IS NOT NULL
 ORDER BY dla.local_authority_name, fgar.probability_of_automation DESC
 LIMIT 10;
 
@@ -149,7 +152,7 @@ Provide ONLY the following exact response format (no explanation, no reasoning, 
 SQL Query:
 ```sql
 <SQL>
-    ```
+```
 """
 
 
@@ -418,6 +421,7 @@ User Question: \"{question}\"
 - Only use real columns from the schema.
 - Do not hardcode arbitrary relationships unless they logically fit.
 - If no meaningful transition columns exist, return only the node SQL.
+- Do not assume that all employees have multiple training cases. Use COUNT(*) to detect actual transitions and always check for NULLs in date comparisons.
 
 4️⃣ Ensure nodes and edges are aligned:
 - FIRST, write the SQL to select the node set.
@@ -434,6 +438,8 @@ User Question: \"{question}\"
 - Use safe table aliases (avoid reserved words).
 - Use only valid categorical values.
 - Use PostgresSQL-compatible syntax.
+- When comparing dates (e.g., e1.completion_date < e2.start_date), always add WHERE conditions to exclude NULL values from both sides of the comparison.
+- When using any column as node_id, source, or target, exclude rows where the value is NULL.
 
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
@@ -444,6 +450,7 @@ User Question: \"{question}\"
 ```sql
 <Write the Nodes SQL here>
 2. Edges SQL:
+```sql
 <Write the Edges SQL here>
 ```
 """
