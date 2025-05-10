@@ -163,7 +163,7 @@ def get_kg_sql_prompt(question, reasoning_type, visualization_type):
     return f"""
 You are an expert assistant generating SQL queries for Knowledge Graph (KG) construction.
 
-⚡ IMPORTANT: Only return the final SQL queries. Do NOT include explanations, reasoning, or comments.
+⚡ IMPORTANT: Only return the final SQL queries in the exact format described. Do NOT include explanations, reasoning, or comments.
 
 Reasoning Type: {reasoning_type}
 Visualization Type: {visualization_type}
@@ -215,11 +215,14 @@ User Question: \"{question}\"
     → wre (workforce_reskilling_events)
     → sstm (soc_code_skill_training_map)
 
-⚠️ OUTPUT FORMAT:
+⚠️ STRICT OUTPUT FORMAT (MANDATORY — for parsing):
 1. Nodes SQL:
 ```sql
 <Write the Nodes SQL here>
+```
+
 2. Edges SQL:
+```sql
 <Write the Edges SQL here>
 ```
 """
@@ -343,11 +346,13 @@ User Question: \"{question}\"
 - Always first output the Nodes SQL, then the Edges SQL.
 - Separate them under clear headers.
 - Example format:
-
 1. Nodes SQL:
 ```sql
 <Write the Nodes SQL here>
+```
+
 2. Edges SQL:
+```sql
 <Write the Edges SQL here>
 ```
 """
@@ -456,10 +461,11 @@ User Question: \"{question}\"
 - Always first output the Nodes SQL, then the Edges SQL.
 - Separate them under clear headers.
 - Example format:
-
 1. Nodes SQL:
 ```sql
 <Write the Nodes SQL here>
+```
+
 2. Edges SQL:
 ```sql
 <Write the Edges SQL here>

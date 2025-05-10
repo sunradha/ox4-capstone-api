@@ -53,6 +53,7 @@ def run_reasoning_pipeline(question):
             sql = parsed_2sqls(llm_sql_response)
             nodes_sql = sql.get('nodes_sql')
             edges_sql = sql.get('edges_sql')
+            print("LLM Response : \n", llm_sql_response)
             print("Nodes SQL : \n", nodes_sql)
             print("Edges SQL : \n", edges_sql)
             nodes_df = run_sql_query_postgres(nodes_sql) if nodes_sql else None
