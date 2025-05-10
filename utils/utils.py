@@ -121,21 +121,20 @@ def parsed_kg_data_output(llm_output_str):
 
 
 def parsed_2sqls(text: str) -> Dict[str, Optional[str]]:
-    # Strip outer triple backticks if present
-    if text.startswith("```") and text.endswith("```"):
-        text = text.strip("```").strip()
-        if text.startswith("sql"):
-            text = text[3:].strip()  # Remove the 'sql' prefix if present
+    # Normalize triple backtick blocks
+    cleaned_text = re.sub(r"```sql\s*", "", text, flags=re.IGNORECASE)
+    cleaned_text = re.sub(r"```", "", cleaned_text)
 
-    pattern_nodes = r"1\. Nodes SQL:\s*SELECT.*?;.*?(?=\n2\. Edges SQL:)"
-    pattern_edges = r"2\. Edges SQL:\s*SELECT.*"
+    # Regex to extract Nodes and Edges SQL blocks
+    pattern_nodes = r"1\. Nodes SQL:\s*(SELECT[\s\S]*?)(?=\n2\. Edges SQL:|\Z)"
+    pattern_edges = r"2\. Edges SQL:\s*(SELECT[\s\S]*)"
 
-    nodes_match = re.search(pattern_nodes, text, re.DOTALL | re.IGNORECASE)
-    edges_match = re.search(pattern_edges, text, re.DOTALL | re.IGNORECASE)
+    nodes_match = re.search(pattern_nodes, cleaned_text, re.IGNORECASE)
+    edges_match = re.search(pattern_edges, cleaned_text, re.IGNORECASE)
 
     result: Dict[str, Optional[str]] = {
-        "nodes_sql": nodes_match.group(0).split("1. Nodes SQL:")[-1].strip() if nodes_match else None,
-        "edges_sql": edges_match.group(0).split("2. Edges SQL:")[-1].strip() if edges_match else None,
+        "nodes_sql": nodes_match.group(1).strip() if nodes_match else None,
+        "edges_sql": edges_match.group(1).strip() if edges_match else None,
     }
 
     return result

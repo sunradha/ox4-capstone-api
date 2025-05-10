@@ -194,8 +194,15 @@ User Question: \"{question}\"
 
 ⚙️ SQL RULES:
 - Always generate two separate SQL queries: one for nodes, one for edges.
-- Nodes SQL → return: node_id, node_label, node_type.
-- Edges SQL → return: source, target, relationship.
+- Nodes SQL → must return:
+    CAST(node_id AS TEXT) AS node_id,
+    node_label,
+    node_type
+- Edges SQL → must return:
+    CAST(source AS TEXT) AS source,
+    CAST(target AS TEXT) AS target,
+    relationship
+- ✅ All UNION branches must use the same data types — always cast source, target, and node_id as TEXT to avoid mismatches (e.g., BIGINT vs VARCHAR).
 - Use DISTINCT or GROUP BY to deduplicate.
 - Apply LIMIT (e.g., LIMIT 15) if needed.
 - Use PostgreSQL-compatible syntax.
@@ -312,6 +319,7 @@ User Question: \"{question}\"
 - Nodes SQL → must return: node_id, node_label, node_type.
 - Edges SQL → must return: source, target, relationship.
 - Explicitly CAST node_id, source, and target to TEXT to avoid type conflicts.
+- All UNION branches must use the same data types.
 - Use DISTINCT or GROUP BY to deduplicate results.
 - Apply LIMIT inside each query if needed (e.g., LIMIT 15).
 - Use safe table aliases (avoid reserved words).
