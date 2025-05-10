@@ -456,7 +456,15 @@ User Question: \"{question}\"
 - Use PostgresSQL-compatible syntax.
 - When comparing dates (e.g., e1.completion_date < e2.start_date), always add WHERE conditions to exclude NULL values from both sides of the comparison.
 - When using any column as node_id, source, or target, exclude rows where the value is NULL.
-
+- DO NOT use reserved keywords as aliases; use:
+    → doc (dim_occupation)
+    → di (dim_industry)
+    → ep (employee_profile)
+    → dla (dim_local_authority)
+    → wrc (workforce_reskilling_cases)
+    → wre (workforce_reskilling_events)
+    → sstm (soc_code_skill_training_map)
+    
 ⚠️ IMPORTANT OUTPUT FORMAT:
 - Always first output the Nodes SQL, then the Edges SQL.
 - Separate them under clear headers.
