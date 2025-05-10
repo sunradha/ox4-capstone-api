@@ -65,7 +65,7 @@ def prepare_chart_data(df, visualization_type, graph_schema=None):
                 df.groupby("series")["y"]
                 .sum()
                 .sort_values(ascending=False)
-                .head(5)
+                .head(6)
                 .index.tolist()
             )
 
